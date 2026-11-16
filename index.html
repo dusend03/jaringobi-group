@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+</head>
+<body>
+<title>자린고비</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* single black-and-white look by design: white paper, black crayon */
+  :root { --ink:#111; --paper:#fff; --soft:#f2f2f2; --mute:#666; color-scheme:light; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; background:var(--paper); color:var(--ink); }
+  body { font-family:'Gaegu', 'Apple SD Gothic Neo', sans-serif; font-size:20px; line-height:1.35; }
+  .app { max-width:480px; margin:0 auto; padding-block:16px 40px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+  h1,h2,h3,p { margin:0; }
+  button, input { font:inherit; color:inherit; }
+  .hidden { display:none !important; }
+
+  /* ── crayon border: drawn on a pseudo element so the photo itself is never filtered ── */
+  .crayon { position:relative; background:var(--paper); }
+  .crayon::before {
+    content:""; position:absolute; inset:0; pointer-events:none;
+    border:3px solid var(--ink);
+    border-radius:255px 18px 225px 18px / 18px 225px 18px 255px;
+    filter:url(#crayon);
+  }
+  .crayon.alt::before { border-radius:18px 225px 18px 255px / 255px 18px 225px 18px; }
+  .crayon.thick::before { border-width:4px; }
+  .ico { width:26px; height:26px; fill:none; stroke:var(--ink); stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; filter:url(#crayon); flex:none; }
+
+  /* top bar */
+  .bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .logo { display:flex; align-items:center; gap:6px; font-size:30px; font-weight:700; letter-spacing:-1px; }
+  .logo .ico { width:34px; height:34px; }
+  .iconbtn { background:none; border:none; padding:8px 10px; display:flex; align-items:center; gap:4px; cursor:pointer; font-size:18px; }
+
+  /* hanging goal */
+  .hang { position:relative; padding-top:34px; margin-bottom:18px; }
+  .hang .string { position:absolute; left:50%; top:0; width:120px; height:46px; transform:translateX(-50%); overflow:visible; }
+  .photo-frame { padding:10px; transform:rotate(-1.2deg); }
+  .photo-frame img { display:block; width:100%; height:auto; max-height:62vh; object-fit:contain; border-radius:6px; background:var(--soft); }
+
+  /* progress */
+  .goal-name { text-align:center; font-size:22px; font-weight:700; margin:-4px 8px 4px; text-wrap:balance; word-break:keep-all; }
+  .login { display:flex; flex-direction:column; padding-top:24px; }
+  .login-hero { display:flex; flex-direction:column; align-items:center; gap:6px; margin-bottom:24px; }
+  .login-fish { width:120px; height:auto; }
+  .login-title { font-size:44px; font-weight:700; letter-spacing:-1px; }
+  .amount { text-align:center; margin:6px 0 10px; }
+  .amount .now { font-size:40px; font-weight:700; }
+  .amount .goal { font-size:24px; color:var(--mute); }
+  .track { height:30px; padding:5px; margin:0 4px; }
+  .fill { height:100%; border-radius:12px 4px 14px 3px; background:
+      repeating-linear-gradient(-55deg, var(--ink) 0 3px, transparent 3px 7px);
+      filter:url(#crayon); transition:width .6s ease; min-width:0; }
+  .pct { display:flex; justify-content:space-between; font-size:18px; color:var(--mute); margin:6px 6px 0; }
+  .pct b { color:var(--ink); font-size:22px; }
+
+  /* today check */
+  .section-title { font-size:22px; font-weight:700; margin:26px 4px 10px; display:flex; align-items:center; gap:6px; }
+  .ask { padding:16px 16px 14px; margin-bottom:12px; }
+  .ask .q { font-size:24px; font-weight:700; }
+  .ask .sub { color:var(--mute); font-size:17px; margin-top:2px; }
+  .choices { display:flex; gap:10px; margin-top:12px; }
+  .btn { flex:1; border:none; background:var(--paper); padding:12px 8px; font-size:21px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .btn.ink { background:var(--ink); color:var(--paper); border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; }
+  .btn.ink .ico { stroke:var(--paper); }
+  .btn:active { transform:translateY(1px) rotate(-.5deg); }
+  .done { display:flex; align-items:center; gap:10px; margin-top:8px; font-size:20px; }
+  .done .tag { font-weight:700; }
+  .undo { margin-left:auto; background:none; border:none; color:var(--mute); text-decoration:underline; cursor:pointer; font-size:16px; }
+  .empty { padding:18px; text-align:center; color:var(--mute); }
+  .cheer { text-align:center; font-size:26px; font-weight:700; padding:14px; margin:16px 0 0; }
+
+  /* forms */
+  .screen-title { font-size:28px; font-weight:700; margin:6px 4px 4px; }
+  .lead { color:var(--mute); margin:0 4px 18px; font-size:18px; }
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:18px; font-weight:700; margin:0 6px 6px; }
+  .input { padding:2px 12px; display:flex; align-items:center; gap:6px; }
+  .input input { border:none; outline:none; background:transparent; width:100%; padding:10px 0; font-size:22px; }
+  .input .unit { font-size:20px; color:var(--mute); white-space:nowrap; }
+  .input input { min-width:0; }
+  .undo { white-space:nowrap; }
+  .field label.upload, .upload { display:flex; margin:0; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:220px; padding:12px; cursor:pointer; text-align:center; color:var(--mute); }
+  .upload img { display:block; width:100%; height:auto; max-height:46vh; object-fit:contain; border-radius:6px; }
+  .upload .ico { width:48px; height:48px; }
+  .row { display:flex; gap:10px; }
+  .row > * { flex:1; }
+  .habit { display:flex; align-items:center; gap:10px; padding:12px 14px; margin-bottom:10px; }
+  .habit .name { font-weight:700; font-size:21px; }
+  .habit .amt { color:var(--mute); font-size:18px; }
+  .habit .grow { flex:1; }
+  .note { font-size:16px; color:var(--mute); margin:6px 6px 0; }
+  .card { padding:14px 16px; margin-bottom:12px; }
+  .toast { position:fixed; left:50%; bottom:calc(28px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; font-size:19px; z-index:10; white-space:nowrap; transition:opacity .3s; }
+
+  /* bottom tabs: 내 굴비 / 그룹 굴비 */
+  .app { padding-bottom:calc(110px + env(safe-area-inset-bottom, 0px)); }
+  .tabbar { position:fixed; left:0; right:0; bottom:0; z-index:20; background:var(--paper);
+    padding:8px max(16px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .tabbar::before { content:""; position:absolute; left:0; right:0; top:0; border-top:3px solid var(--ink); filter:url(#crayon); }
+  .tabbar .inner { max-width:480px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .tab { background:none; border:none; padding:8px; font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; color:var(--mute); }
+  .tab .ico { stroke:var(--mute); }
+  .tab.on { color:var(--ink); background:var(--soft); border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; }
+  .tab.on .ico { stroke:var(--ink); }
+
+  /* group members */
+  .member { display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:10px; }
+  .avatar { width:44px; height:44px; flex:none; display:grid; place-items:center; font-size:22px; font-weight:700; position:relative; }
+  .avatar::before { content:""; position:absolute; inset:0; border:3px solid var(--ink); border-radius:50% 46% 52% 48% / 48% 52% 46% 50%; filter:url(#crayon); }
+  .member .who { flex:1; min-width:0; }
+  .member .who .name { font-weight:700; font-size:21px; }
+  .member .who .amt { color:var(--mute); font-size:17px; }
+  .chip { font-size:16px; padding:2px 10px; white-space:nowrap; }
+  .chip.done { background:var(--ink); color:var(--paper); border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; }
+  .poke { flex:none; padding:8px 14px; font-size:18px; }
+  .poke[disabled] { color:var(--mute); cursor:default; }
+  .member.wiggle { animation:wiggle .5s ease 2; }
+  @keyframes wiggle { 0%,100% { transform:rotate(0) } 25% { transform:rotate(-2deg) translateX(-4px) } 75% { transform:rotate(2deg) translateX(4px) } }
+
+  /* sheets & fanfare overlay */
+  .veil { position:fixed; inset:0; z-index:40; background:rgba(255,255,255,.86); display:flex; align-items:flex-end; justify-content:center;
+    padding:16px max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .sheet { width:100%; max-width:480px; padding:20px 18px 18px; }
+  .linkbox { font-family:ui-monospace, Menlo, monospace; font-size:14px; word-break:break-all; padding:10px 12px; background:var(--soft); border-radius:8px; margin:8px 0 10px; user-select:all; }
+  .fanfare { position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:16px; background:rgba(255,255,255,.7); }
+  .fanfare canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; }
+  .fanfare .card { position:relative; max-width:360px; width:100%; text-align:center; padding:26px 20px 20px; animation:pop .5s cubic-bezier(.2,1.6,.4,1); }
+  .fanfare .big { font-size:52px; font-weight:700; letter-spacing:-1px; line-height:1.1; }
+  .fanfare .ico.trumpet { width:72px; height:72px; }
+  @keyframes pop { from { transform:scale(.4) rotate(-8deg); opacity:0 } to { transform:scale(1) rotate(0); opacity:1 } }
+  @media (prefers-reduced-motion: reduce) { .member.wiggle, .fanfare .card { animation:none; } }
+</style>
+<!-- crayon filters & hand-drawn icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="crayon" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="3" result="wob"/>
+      <feDisplacementMap in="SourceGraphic" in2="wob" scale="3.2" xChannelSelector="R" yChannelSelector="G" result="shaky"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="8" result="grain"/>
+      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.25" result="mask"/>
+      <feComposite in="shaky" in2="mask" operator="in"/>
+    </filter>
+    <symbol id="i-fish" viewBox="0 0 32 32"><path d="M4 16c4-6 11-8 17-5 2 1 3 2 4 3l3-3c0 2-1 4-1 5 0 1 1 3 1 5l-3-3c-1 1-2 2-4 3-6 3-13 1-17-5z"/><circle cx="9" cy="15" r=".9"/><path d="M14 12c1 2 1 6 0 8M18 12c1 2 1 6 0 8"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 32 32"><path d="M6 26l2-7L21 6c1-1 3-1 4 0l1 1c1 1 1 3 0 4L13 24z"/><path d="M8 19l5 5M19 8l5 5"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 32 32"><path d="M5 11c0-1 1-2 2-2h4l2-3h6l2 3h4c1 0 2 1 2 2v13c0 1-1 2-2 2H7c-1 0-2-1-2-2z"/><circle cx="16" cy="17" r="5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 32 32"><path d="M6 17l6 6L26 8"/></symbol>
+    <symbol id="i-x" viewBox="0 0 32 32"><path d="M8 8l16 16M24 8L8 24"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 32 32"><path d="M16 6v20M6 16h20"/></symbol>
+    <symbol id="i-back" viewBox="0 0 32 32"><path d="M19 7l-9 9 9 9"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 32 32"><path d="M9 22V14c0-4 3-7 7-7s7 3 7 7v8l2 2H7z"/><path d="M13 26c1 2 5 2 6 0"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 32 32"><path d="M7 9h18M12 9V6h8v3M9 9l1 17h12l1-17"/></symbol>
+    <symbol id="i-home" viewBox="0 0 32 32"><path d="M5 15L16 6l11 9"/><path d="M8 13v13h16V13"/><path d="M13 26v-7h6v7"/></symbol>
+    <symbol id="i-group" viewBox="0 0 32 32"><circle cx="11" cy="11" r="4"/><circle cx="22" cy="12" r="3.5"/><path d="M3 26c0-5 4-8 8-8s8 3 8 8"/><path d="M19 19c4-1 9 1 10 6"/></symbol>
+    <symbol id="i-trumpet" viewBox="0 0 32 32"><path d="M4 13v6h4l14 7V6L8 13z"/><path d="M26 11c2 2 2 8 0 10M28 8c4 4 4 12 0 16"/><path d="M9 19l1 6h3l-1-5"/></symbol>
+    <symbol id="i-poke" viewBox="0 0 32 32"><path d="M10 30v-8l-4-5c-1-2 1-4 3-2l3 3V5c0-2 3-2 3 0v9c0-2 3-2 3 0v1c0-2 3-2 3 0v1c0-2 3-2 3 0v6c0 3-1 5-3 8"/></symbol>
+    <symbol id="i-link" viewBox="0 0 32 32"><path d="M13 19l6-6"/><path d="M11 15l-3 3c-3 3 3 9 6 6l3-3"/><path d="M21 17l3-3c3-3-3-9-6-6l-3 3"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10"/><path d="M12 13c1-2 7-2 8 0s-8 4-8 6 7 2 8 0M16 9v14"/></symbol>
+  </defs>
+</svg>
+
+<div class="app" id="app"></div>
+<div class="toast hidden" id="toast"></div>
+
+<script>
+(() => {
+  const KEY = 'jaringobi.v1';
+  const $app = document.getElementById('app');
+  const won = n => Math.round(n).toLocaleString('ko-KR') + '원';
+  const icon = (id, cls='') => `<svg class="ico ${cls}"><use href="#i-${id}"/></svg>`;
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  const digits = v => Number(String(v).replace(/[^\d]/g, '')) || 0;
+  const DEFAULT_PHOTO = 'gulbi.svg';
+  const SAMPLE_PHOTO = 'sample.jpg';
+
+  // ── state ──
+  let state = load();
+  function load() {
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return s; } catch (e) {}
+    return { goal:null, habits:[], logs:{}, notify:{ on:false, time:'21:00' } };
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
+    catch (e) { toast('저장 공간이 부족해요. 더 작은 사진을 써 주세요.'); return false; }
+  }
+  // logs[date][habitId] = { s: true|false, a: amount-at-the-time }
+  // extras = one-off savings typed on the home screen: { id, date, name, amount }
+  const total = () => Object.values(state.logs).reduce((sum, day) =>
+    sum + Object.values(day).reduce((s, l) => s + (l.s ? l.a : 0), 0), 0)
+    + (state.extras || []).reduce((s, x) => s + x.amount, 0);
+
+  // today's saved amount (habits marked 아꼈어 + one-off savings)
+  const dayTotal = d => Object.values(state.logs[d] || {}).reduce((s, l) => s + (l.s ? l.a : 0), 0)
+    + (state.extras || []).filter(x => x.date === d).reduce((s, x) => s + x.amount, 0);
+  // daily goal = what all habits save together in one day
+  const dailyGoal = () => state.habits.reduce((s, h) => s + h.amount, 0);
+  // my savings since the group started count toward the group goal
+  const myGroupSaved = () => {
+    const from = state.group?.createdAt || '0000';
+    return Object.entries(state.logs).reduce((s, [d, day]) => d < from ? s : s + Object.values(day).reduce((a, l) => a + (l.s ? l.a : 0), 0), 0)
+      + (state.extras || []).filter(x => x.date >= from).reduce((s, x) => s + x.amount, 0);
+  };
+
+  // "커피 안 사기" → "오늘 커피값 아꼈어?"
+  function question(name) {
+    const n = name.trim();
+    let m = n.match(/^(.+?)\s*안\s*사(기)?$/);
+    if (m) return `오늘 ${m[1]}값 아꼈어?`;
+    m = n.match(/^(.+?)\s*안\s*(타|먹|하|시키|가)(기)?$/);
+    if (m) return `오늘 ${m[1]} 참았어?`;
+    return `오늘 ‘${n}’ 지켰어?`;
+  }
+
+  // ── routing ──
+  // state.user = { email } after the start-screen login, or { guest:true }; presentation only, nothing is verified
+  const startScreen = () => !state.user ? 'login' : state.goal ? 'home' : state.group ? 'group' : 'goal';
+  let screen = startScreen();
+  let extraOpen = false, extraDraft = { name: '', amount: 0 };
+  let draft = null;
+  function go(s) { screen = s; draft = null; render(); window.scrollTo(0, 0); }
+
+  function render() {
+    if (screen === 'home') renderHome();
+    else if (screen === 'goal') renderGoal();
+    else if (screen === 'habit') renderHabit();
+    else if (screen === 'edit') renderEdit();
+    else if (screen === 'login') renderLogin();
+    else if (screen === 'group') renderGroup();
+    else if (screen === 'groupEdit') renderGroupEdit();
+  }
+
+  // ── home ──
+  function renderHome() {
+    const g = state.goal, sum = total();
+    const pct = g.price ? Math.min(100, sum / g.price * 100) : 0;
+    const t = today(), log = state.logs[t] || {};
+    const asks = state.habits.map(h => {
+      const l = log[h.id];
+      if (!l) return `
+        <div class="ask crayon">
+          <p class="q">${esc(question(h.name))}</p>
+          <p class="sub">${esc(h.name)} · ${won(h.amount)}</p>
+          <div class="choices">
+            <button class="btn ink" data-log="${h.id}" data-v="1">${icon('check')}아꼈어</button>
+            <button class="btn crayon alt" data-log="${h.id}" data-v="0">${icon('x')}못 아꼈어</button>
+          </div>
+        </div>`;
+      return `
+        <div class="ask crayon alt">
+          <p class="sub">${esc(h.name)}</p>
+          <div class="done">${icon(l.s ? 'check' : 'x')}
+            <span class="tag">${l.s ? `아꼈어 · +${won(l.a)}` : '못 아꼈어'}</span>
+            <button class="undo" data-undo="${h.id}">다시 기록</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    $app.innerHTML = `
+      <div class="bar">
+        <div class="logo">${icon('fish')}자린고비</div>
+        <button class="iconbtn" data-go="edit">${icon('pencil')}수정</button>
+      </div>
+      <div class="hang">
+        <svg class="string" viewBox="0 0 120 46"><g style="filter:url(#crayon)" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round">
+          <circle cx="60" cy="6" r="4"/><path d="M60 10 L18 44 M60 10 L102 44"/></g></svg>
+        <div class="photo-frame crayon thick"><img src="${g.photo}" alt="${esc(g.name || '목표 물건 사진')}"></div>
+      </div>
+      ${g.name ? `<p class="goal-name">${esc(g.name)}</p>` : ''}
+      <div class="amount"><span class="now">${won(sum)}</span> <span class="goal">/ ${won(g.price)}</span></div>
+      <div class="track crayon"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="pct"><span>달성률 <b>${pct >= 100 ? 100 : pct.toFixed(1)}%</b></span><span>남은 돈 ${won(Math.max(0, g.price - sum))}</span></div>
+      ${pct >= 100 ? `<div class="cheer crayon">굴비를 다 모았어요! 🎉</div>` : ''}
+      <div class="section-title">${icon('coin')}오늘의 절약</div>
+      ${asks || `<div class="empty crayon">아낄 소비를 먼저 정해 주세요.<br><br><button class="btn ink" data-go="habit" style="width:100%">${icon('plus')}아낄 소비 정하기</button></div>`}
+      ${(state.extras || []).filter(x => x.date === t).map(x => `
+        <div class="ask crayon alt">
+          <div class="done" style="margin-top:0">${icon('check')}
+            <span class="tag">${esc(x.name)} · +${won(x.amount)}</span>
+            <button class="undo" data-delx="${x.id}">지우기</button>
+          </div>
+        </div>`).join('')}
+      ${extraOpen ? `
+        <div class="ask crayon thick">
+          <p class="q" style="margin-bottom:10px">오늘 아낀 소비</p>
+          <div class="field"><div class="input crayon"><input id="xName" placeholder="점심 도시락 싸가서" maxlength="24" value="${esc(extraDraft.name)}"></div></div>
+          <div class="field"><div class="input crayon alt"><input id="xAmt" inputmode="numeric" placeholder="10,000" value="${extraDraft.amount ? extraDraft.amount.toLocaleString('ko-KR') : ''}"><span class="unit">원 아낌</span></div></div>
+          <div class="choices">
+            <button class="btn ink" id="xSave">${icon('check')}기록</button>
+            <button class="btn crayon alt" id="xCancel">취소</button>
+          </div>
+        </div>`
+      : `<button class="btn crayon" id="xOpen" style="width:100%;margin-top:4px">${icon('plus')}오늘 아낀 소비</button>`}
+      ${tabbar('home')}
+    `;
+    bindExtra();
+  }
+
+  const tabbar = on => `
+    <nav class="tabbar" aria-label="탭"><div class="inner">
+      <button class="tab ${on === 'home' ? 'on' : ''}" data-go="home">${icon('home')}내 굴비</button>
+      <button class="tab ${on === 'group' ? 'on' : ''}" data-go="group">${icon('group')}그룹 굴비</button>
+    </div></nav>`;
+
+  function bindExtra() {
+    document.getElementById('xOpen')?.addEventListener('click', () => {
+      extraOpen = true; renderHome(); document.getElementById('xName').focus();
+    });
+    if (!extraOpen) return;
+    const n = document.getElementById('xName'), a = document.getElementById('xAmt');
+    n.addEventListener('input', () => { extraDraft.name = n.value; });
+    a.addEventListener('input', () => {
+      extraDraft.amount = digits(a.value);
+      a.value = extraDraft.amount ? extraDraft.amount.toLocaleString('ko-KR') : '';
+    });
+    document.getElementById('xCancel').addEventListener('click', () => {
+      extraOpen = false; extraDraft = { name: '', amount: 0 }; renderHome();
+    });
+    document.getElementById('xSave').addEventListener('click', () => {
+      const name = extraDraft.name.trim();
+      if (!name) return toast('무엇을 아꼈는지 적어 주세요.');
+      if (!extraDraft.amount) return toast('아낀 금액을 적어 주세요.');
+      state.extras = state.extras || [];
+      state.extras.push({ id: uid(), date: today(), name, amount: extraDraft.amount });
+      save(); toast(`+${won(extraDraft.amount)} 굴비에 한 걸음!`);
+      extraOpen = false; extraDraft = { name: '', amount: 0 }; renderHome();
+      checkFanfare();
+    });
+  }
+
+  // ── goal (create / edit) ──
+  function renderGoal() {
+    draft = draft || { photo: state.goal?.photo || '', price: state.goal?.price || '' };
+    const first = !state.goal;
+    $app.innerHTML = `
+      <div class="bar">
+        ${first ? `<div class="logo">${icon('fish')}자린고비</div>` : `<button class="iconbtn" data-go="edit">${icon('back')}뒤로</button>`}
+      </div>
+      <h2 class="screen-title">굴비 달기</h2>
+      <p class="lead">사고 싶은 물건 사진을 올리고 목표 가격을 적어 주세요.</p>
+      <div class="field">
+        <label>사진</label>
+        <label class="upload crayon thick" for="photoIn">
+          ${draft.photo ? `<img src="${draft.photo}" alt="선택한 사진">` : `${icon('camera')}<span>눌러서 사진 올리기</span>`}
+        </label>
+        <input id="photoIn" type="file" accept="image/*" class="hidden">
+        <p class="note">사진을 올리지 않으면 기본 굴비 그림으로 걸려요.</p>
+      </div>
+      <div class="field">
+        <label for="priceIn">목표 가격</label>
+        <div class="input crayon alt"><input id="priceIn" inputmode="numeric" placeholder="400,000" value="${draft.price ? Number(draft.price).toLocaleString('ko-KR') : ''}"><span class="unit">원</span></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ink" id="saveGoal">${icon('check')}${first ? '굴비 걸기' : '저장'}</button>
+        ${first ? `<button class="btn crayon alt" id="sampleGoal">발표용 예시</button>` : ''}
+      </div>
+  ${first ? tabbar('home') : ''}
+    `;
+    document.getElementById('sampleGoal')?.addEventListener('click', loadSample);
+    const priceIn = document.getElementById('priceIn');
+    priceIn.addEventListener('input', () => {
+      draft.price = digits(priceIn.value);
+      priceIn.value = draft.price ? draft.price.toLocaleString('ko-KR') : '';
+    });
+    document.getElementById('photoIn').addEventListener('change', async e => {
+      const f = e.target.files[0]; if (!f) return;
+      draft.photo = await shrink(f);
+      renderGoal();
+    });
+    document.getElementById('saveGoal').addEventListener('click', () => {
+      if (!draft.price) return toast('목표 가격을 적어 주세요.');
+      const prev = state.goal;
+      state.goal = { photo: draft.photo || DEFAULT_PHOTO, price: draft.price, name: prev && draft.photo === prev.photo ? prev.name : undefined };
+      if (!save()) { state.goal = prev; return; }
+      if (first) go(state.habits.length ? 'home' : 'habit'); else { toast('저장했어요'); go('edit'); }
+    });
+  }
+
+  // presentation example: Sony headphones and a coffee habit, starting from 0원
+  function loadSample() {
+    const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+    const logs = {};
+    state = {
+      goal: { photo: SAMPLE_PHOTO, price: 399000, name: '소니 WH-1000XM5 노이즈캔슬링 헤드폰' },
+      habits: [ { id: 'coffee', name: '커피 안 사기', amount: 3000 } ],
+      logs, extras: [], notify: state.notify, user: state.user,
+    };
+    save(); toast('발표용 예시를 걸었어요'); go('home');
+  }
+
+  // keep the real photo, just resized so it fits in browser storage
+  function shrink(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const max = 1400, k = Math.min(1, max / Math.max(img.width, img.height));
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          res(c.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = rej; img.src = r.result;
+      };
+      r.onerror = rej; r.readAsDataURL(file);
+    });
+  }
+
+  // ── habit (create / edit) ──
+  let editingHabit = null;
+  function renderHabit() {
+    const h = state.habits.find(x => x.id === editingHabit);
+    draft = draft || { name: h?.name || '', amount: h?.amount || '' };
+    $app.innerHTML = `
+      <div class="bar">
+        <button class="iconbtn" data-go="${state.habits.length ? 'edit' : 'home'}">${icon('back')}뒤로</button>
+      </div>
+      <h2 class="screen-title">아낄 소비 정하기</h2>
+      <p class="lead">아낄 행동과 한 번에 아끼는 금액만 적어 주세요.</p>
+      <div class="field">
+        <label for="nameIn">아낄 행동</label>
+        <div class="input crayon"><input id="nameIn" placeholder="커피 안 사기" value="${esc(draft.name)}" maxlength="20"></div>
+      </div>
+      <div class="field">
+        <label for="amtIn">한 번에 아끼는 금액</label>
+        <div class="input crayon alt"><input id="amtIn" inputmode="numeric" placeholder="3,000" value="${draft.amount ? Number(draft.amount).toLocaleString('ko-KR') : ''}"><span class="unit">원</span></div>
+      </div>
+      <p class="note" id="preview">${draft.name ? `매일 이렇게 물어볼게요: “${esc(question(draft.name))}”` : ''}</p>
+      <button class="btn ink" id="saveHabit" style="width:100%;margin-top:16px">${icon('check')}저장</button>
+      ${h ? `<button class="btn crayon alt" id="delHabit" style="width:100%;margin-top:12px">${icon('trash')}이 항목 지우기</button>` : ''}
+    `;
+    const nameIn = document.getElementById('nameIn'), amtIn = document.getElementById('amtIn'), pv = document.getElementById('preview');
+    nameIn.addEventListener('input', () => {
+      draft.name = nameIn.value;
+      pv.textContent = draft.name.trim() ? `매일 이렇게 물어볼게요: “${question(draft.name)}”` : '';
+    });
+    amtIn.addEventListener('input', () => {
+      draft.amount = digits(amtIn.value);
+      amtIn.value = draft.amount ? draft.amount.toLocaleString('ko-KR') : '';
+    });
+    document.getElementById('saveHabit').addEventListener('click', () => {
+      const name = draft.name.trim();
+      if (!name) return toast('아낄 행동을 적어 주세요.');
+      if (!draft.amount) return toast('금액을 적어 주세요.');
+      if (h) { h.name = name; h.amount = draft.amount; }
+      else state.habits.push({ id: uid(), name, amount: draft.amount });
+      save(); editingHabit = null; toast('저장했어요');
+      go(h ? 'edit' : 'home');
+    });
+    document.getElementById('delHabit')?.addEventListener('click', e => {
+      const b = e.currentTarget;
+      if (!b.dataset.sure) { b.dataset.sure = '1'; b.innerHTML = `${icon('trash')}한 번 더 누르면 지워져요`; toast('이미 모은 금액은 그대로 남아요'); return; }
+      state.habits = state.habits.filter(x => x.id !== h.id);
+      save(); editingHabit = null; go('edit');
+    });
+  }
+
+  // ── start screen: login or start without login ──
+  function renderLogin() {
+    $app.innerHTML = `
+      <div class="login">
+        <div class="login-hero">
+          <img src="${DEFAULT_PHOTO}" alt="" class="login-fish">
+          <h1 class="login-title">자린고비</h1>
+          <p class="lead" style="text-align:center;margin:0">사고 싶은 걸 굴비처럼 걸어두고<br>참은 만큼 모아요</p>
+        </div>
+        <form id="loginForm" novalidate>
+          <div class="field">
+            <label for="emailIn">이메일</label>
+            <div class="input crayon"><input id="emailIn" type="email" autocomplete="username" placeholder="gulbi@example.com"></div>
+          </div>
+          <div class="field">
+            <label for="pwIn">비밀번호</label>
+            <div class="input crayon alt"><input id="pwIn" type="password" autocomplete="current-password" placeholder="••••••"></div>
+          </div>
+          <button class="btn ink" type="submit" style="width:100%;margin-top:6px">로그인</button>
+        </form>
+        <button class="btn crayon alt" id="guestBtn" style="width:100%;margin-top:12px">로그인 없이 시작하기</button>
+      </div>
+    `;
+    document.getElementById('loginForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const email = document.getElementById('emailIn').value.trim();
+      const pw = document.getElementById('pwIn').value;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast('이메일을 확인해 주세요.');
+      if (!pw) return toast('비밀번호를 적어 주세요.');
+      state.user = { email }; save(); toast('로그인했어요'); go(startScreen());
+    });
+    document.getElementById('guestBtn').addEventListener('click', () => {
+      state.user = { guest: true }; save(); go(startScreen());
+    });
+  }
+
+  // ── fanfare: only when today's savings reach 5× the daily goal (once a day) ──
+  function checkFanfare() {
+    const goal = dailyGoal(), d = today(), got = dayTotal(d);
+    state.fanfare = state.fanfare || {};
+    if (!goal || got < goal * 5 || state.fanfare[d]) return;
+    state.fanfare[d] = true; save();
+    showFanfare(got, goal);
+  }
+  function showFanfare(got, goal) {
+    const el = document.createElement('div');
+    el.className = 'fanfare';
+    el.innerHTML = `<canvas></canvas>
+      <div class="card crayon thick" role="dialog" aria-label="빵빠레">
+        <svg class="ico trumpet"><use href="#i-trumpet"/></svg>
+        <p class="big">빵빠레!</p>
+        <p style="font-size:22px;margin-top:6px">오늘 목표의 <b>${Math.floor(got / goal)}배</b>를 아꼈어요</p>
+        <p class="lead" style="margin:4px 0 16px">${won(got)} / 하루 목표 ${won(goal)}</p>
+        <button class="btn ink" style="width:100%">고마워!</button>
+      </div>`;
+    document.body.appendChild(el);
+    const close = () => { el.remove(); cancelAnimationFrame(raf); };
+    el.querySelector('button').addEventListener('click', close);
+    el.addEventListener('click', e => { if (e.target === el) close(); });
+    let raf = 0;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // black-and-white confetti burst from both bottom corners
+    const cv = el.querySelector('canvas'), dpr = devicePixelRatio || 1;
+    const W = innerWidth, H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+    const inks = ['#111', '#111', '#555', '#999'];
+    const bits = Array.from({ length: 160 }, (_, i) => {
+      const left = i % 2 === 0, a = (left ? -1 : -2.14) + (Math.random() - .5) * .7, v = 9 + Math.random() * 9;
+      return { x: left ? 0 : W, y: H, vx: Math.cos(a) * v * (left ? 1 : 1), vy: Math.sin(a) * v, r: Math.random() * 6,
+        vr: (Math.random() - .5) * .3, s: 5 + Math.random() * 8, k: i % 3, c: inks[i % 4] };
+    });
+    const t0 = performance.now();
+    (function tick(t) {
+      ctx.clearRect(0, 0, W, H);
+      for (const b of bits) {
+        b.vy += .28; b.vx *= .99; b.x += b.vx; b.y += b.vy; b.r += b.vr;
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r); ctx.fillStyle = ctx.strokeStyle = b.c; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        if (b.k === 0) ctx.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2);
+        else if (b.k === 1) { ctx.beginPath(); ctx.moveTo(0, -b.s / 2); ctx.lineTo(b.s / 2, b.s / 2); ctx.lineTo(-b.s / 2, b.s / 2); ctx.fill(); }
+        else { ctx.beginPath(); ctx.moveTo(-b.s, 0); ctx.quadraticCurveTo(-b.s / 2, -b.s / 2, 0, 0); ctx.quadraticCurveTo(b.s / 2, b.s / 2, b.s, 0); ctx.stroke(); }
+        ctx.restore();
+      }
+      if (t - t0 < 4000) raf = requestAnimationFrame(tick); else ctx.clearRect(0, 0, W, H);
+    })(t0);
+  }
+
+  // ── group: shared goal with friends (presentation demo; friends are simulated on this device) ──
+  const initial = n => [...n.trim()][0] || '?';
+  function sampleGroup() {
+    state.group = {
+      name: '제주도 같이 가자', price: 600000, photo: DEFAULT_PHOTO, createdAt: today(),
+      members: [
+        { id: 'jimin', name: '지민', saved: 84000, habit: { name: '배달 안 시키기', amount: 15000 }, today: { date: today(), s: true, a: 15000 } },
+        { id: 'seojun', name: '서준', saved: 51000, habit: { name: '택시 안 타기', amount: 12000 } },
+        { id: 'harin', name: '하린', saved: 127000, habit: { name: '커피 안 사기', amount: 4500 } },
+      ],
+    };
+    save(); toast('발표용 그룹을 만들었어요'); go('group');
+  }
+
+  function renderGroup() {
+    const g = state.group;
+    if (!g) {
+      $app.innerHTML = `
+        <div class="bar"><div class="logo">${icon('group')}그룹 굴비</div></div>
+        <div class="hang">
+          <svg class="string" viewBox="0 0 120 46"><g style="filter:url(#crayon)" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round">
+            <circle cx="60" cy="6" r="4"/><path d="M60 10 L18 44 M60 10 L102 44"/></g></svg>
+          <div class="photo-frame crayon thick" style="max-width:220px;margin:0 auto"><img src="${DEFAULT_PHOTO}" alt=""></div>
+        </div>
+        <p class="screen-title" style="text-align:center">친구와 같이 굴비 걸기</p>
+        <p class="lead" style="text-align:center">공동 목표를 정하고, 각자 아낀 돈을 함께 모아요.</p>
+        <div class="row">
+          <button class="btn ink" data-go="groupEdit">${icon('plus')}그룹 만들기</button>
+          <button class="btn crayon alt" id="sampleGroup">발표용 예시</button>
+        </div>
+        ${tabbar('group')}`;
+      document.getElementById('sampleGroup').addEventListener('click', sampleGroup);
+      return;
+    }
+    const mine = myGroupSaved(), d = today();
+    const sum = mine + g.members.reduce((s, m) => s + m.saved, 0);
+    const pct = Math.min(100, sum / g.price * 100);
+    const meDone = dayTotal(d) > 0;
+    const rows = g.members.map(m => {
+      const done = m.today?.date === d && m.today.s, poked = m.pokedOn === d;
+      return `
+        <div class="member crayon alt" data-member="${m.id}">
+          <div class="avatar">${esc(initial(m.name))}</div>
+          <div class="who"><div class="name">${esc(m.name)}</div><div class="amt">${won(m.saved)} 모음</div></div>
+          ${done ? `<span class="chip done">오늘 아꼈어</span>`
+            : `<button class="btn crayon poke" data-poke="${m.id}" ${poked ? 'disabled' : ''}>${icon('poke')}${poked ? '콕 찔렀어' : '콕'}</button>`}
+        </div>`;
+    }).join('');
+    $app.innerHTML = `
+      <div class="bar">
+        <div class="logo">${icon('group')}그룹 굴비</div>
+        <button class="iconbtn" data-go="groupEdit">${icon('pencil')}수정</button>
+      </div>
+      <div class="hang">
+        <svg class="string" viewBox="0 0 120 46"><g style="filter:url(#crayon)" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round">
+          <circle cx="60" cy="6" r="4"/><path d="M60 10 L18 44 M60 10 L102 44"/></g></svg>
+        <div class="photo-frame crayon thick"><img src="${g.photo}" alt="${esc(g.name)}" style="max-height:30vh"></div>
+      </div>
+      <p class="goal-name">${esc(g.name)}</p>
+      <div class="amount"><span class="now">${won(sum)}</span> <span class="goal">/ ${won(g.price)}</span></div>
+      <div class="track crayon"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="pct"><span>달성률 <b>${pct >= 100 ? 100 : pct.toFixed(1)}%</b></span><span>남은 돈 ${won(Math.max(0, g.price - sum))}</span></div>
+      ${pct >= 100 ? `<div class="cheer crayon">다 같이 굴비를 모았어요! 🎉</div>` : ''}
+      <div class="section-title">${icon('group')}함께 모으는 친구 ${g.members.length + 1}명</div>
+      <div class="member crayon">
+        <div class="avatar">나</div>
+        <div class="who"><div class="name">나</div><div class="amt">${won(mine)} 모음</div></div>
+        ${meDone ? `<span class="chip done">오늘 아꼈어</span>` : `<span class="chip">아직</span>`}
+      </div>
+      ${rows}
+      <button class="btn ink" id="inviteBtn" style="width:100%;margin-top:4px">${icon('link')}친구 초대</button>
+      <p class="note" style="text-align:center">내가 ‘내 굴비’에서 아낀 돈은 그룹에도 함께 모여요.</p>
+      ${tabbar('group')}`;
+    document.getElementById('inviteBtn').addEventListener('click', openInvite);
+  }
+
+  function poke(id) {
+    const g = state.group, m = g?.members.find(x => x.id === id);
+    if (!m) return;
+    m.pokedOn = today(); save(); renderGroup();
+    document.querySelector(`[data-member="${id}"]`)?.classList.add('wiggle');
+    toast(`${m.name}님을 콕 찔렀어요!`);
+    // demo: the poked friend answers by saving a moment later
+    setTimeout(() => {
+      if (!state.group || m.today?.date === today()) return;
+      const a = m.habit?.amount || 3000;
+      m.today = { date: today(), s: true, a }; m.saved += a; save();
+      if (screen === 'group') renderGroup();
+      toast(`${m.name}: 콕 받고 아꼈어! +${won(a)}`);
+    }, 2500);
+  }
+
+  // invite link carries only the group name and goal; opening it joins a demo copy of the group
+  const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const dec = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
+  function openInvite() {
+    const g = state.group;
+    const link = `${location.origin}${location.pathname}#invite-${enc({ n: g.name, p: g.price })}`;
+    const el = document.createElement('div');
+    el.className = 'veil';
+    el.innerHTML = `
+      <div class="sheet crayon thick" role="dialog" aria-label="친구 초대">
+        <p class="q" style="font-size:24px;font-weight:700">친구 초대</p>
+        <p class="lead" style="margin:4px 0 0">이 링크를 보내면 친구가 ‘${esc(g.name)}’ 그룹에 들어와요.</p>
+        <div class="linkbox" id="inviteLink">${esc(link)}</div>
+        <button class="btn ink" id="copyLink" style="width:100%">${icon('link')}링크 복사</button>
+        <div class="section-title" style="margin:20px 2px 8px">이름으로 추가</div>
+        <div class="row">
+          <div class="input crayon alt" style="flex:2"><input id="friendName" placeholder="친구 이름" maxlength="10"></div>
+          <button class="btn crayon" id="addFriend" style="flex:1">추가</button>
+        </div>
+        <button class="btn" id="closeInvite" style="width:100%;margin-top:12px;color:var(--mute)">닫기</button>
+      </div>`;
+    document.body.appendChild(el);
+    const close = () => el.remove();
+    el.addEventListener('click', e => { if (e.target === el) close(); });
+    el.querySelector('#closeInvite').addEventListener('click', close);
+    el.querySelector('#copyLink').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(link); toast('초대 링크를 복사했어요'); }
+      catch (e) { getSelection().selectAllChildren(el.querySelector('#inviteLink')); toast('링크를 길게 눌러 복사해 주세요'); }
+    });
+    el.querySelector('#addFriend').addEventListener('click', () => {
+      const name = el.querySelector('#friendName').value.trim();
+      if (!name) return toast('친구 이름을 적어 주세요.');
+      state.group.members.push({ id: uid(), name, saved: 0, habit: { name: '커피 안 사기', amount: 3000 } });
+      save(); close(); renderGroup(); toast(`${name}님이 그룹에 들어왔어요`);
+    });
+  }
+
+  function renderGroupEdit() {
+    const g = state.group;
+    draft = draft || { name: g?.name || '', price: g?.price || '', photo: g?.photo || '' };
+    $app.innerHTML = `
+      <div class="bar"><button class="iconbtn" data-go="group">${icon('back')}뒤로</button></div>
+      <h2 class="screen-title">${g ? '그룹 목표 수정' : '그룹 만들기'}</h2>
+      <p class="lead">친구들과 함께 모을 목표를 정해요.</p>
+      <div class="field">
+        <label for="gName">그룹 이름</label>
+        <div class="input crayon"><input id="gName" placeholder="제주도 같이 가자" maxlength="20" value="${esc(draft.name)}"></div>
+      </div>
+      <div class="field">
+        <label for="gPrice">공동 목표 금액</label>
+        <div class="input crayon alt"><input id="gPrice" inputmode="numeric" placeholder="600,000" value="${draft.price ? Number(draft.price).toLocaleString('ko-KR') : ''}"><span class="unit">원</span></div>
+      </div>
+      <div class="field">
+        <label>사진</label>
+        <label class="upload crayon thick" for="gPhoto" style="min-height:160px">
+          ${draft.photo ? `<img src="${draft.photo}" alt="선택한 사진">` : `${icon('camera')}<span>눌러서 사진 올리기</span>`}
+        </label>
+        <input id="gPhoto" type="file" accept="image/*" class="hidden">
+        <p class="note">사진을 올리지 않으면 기본 굴비 그림으로 걸려요.</p>
+      </div>
+      <button class="btn ink" id="gSave" style="width:100%">${icon('check')}${g ? '저장' : '그룹 만들기'}</button>
+      ${g ? `<button class="btn crayon alt" id="gLeave" style="width:100%;margin-top:12px">${icon('trash')}그룹 나가기</button>` : ''}`;
+    const n = document.getElementById('gName'), p = document.getElementById('gPrice');
+    n.addEventListener('input', () => { draft.name = n.value; });
+    p.addEventListener('input', () => { draft.price = digits(p.value); p.value = draft.price ? draft.price.toLocaleString('ko-KR') : ''; });
+    document.getElementById('gPhoto').addEventListener('change', async e => {
+      const f = e.target.files[0]; if (!f) return;
+      draft.photo = await shrink(f); renderGroupEdit();
+    });
+    document.getElementById('gSave').addEventListener('click', () => {
+      if (!draft.price) return toast('공동 목표 금액을 적어 주세요.');
+      const name = draft.name.trim() || '우리 그룹';
+      if (g) Object.assign(g, { name, price: draft.price, photo: draft.photo || DEFAULT_PHOTO });
+      else state.group = { name, price: draft.price, photo: draft.photo || DEFAULT_PHOTO, createdAt: today(), members: [] };
+      if (!save()) return;
+      toast(g ? '저장했어요' : '그룹을 만들었어요'); go('group');
+    });
+    document.getElementById('gLeave')?.addEventListener('click', e => {
+      const b = e.currentTarget;
+      if (!b.dataset.sure) { b.dataset.sure = '1'; b.innerHTML = `${icon('trash')}한 번 더 누르면 나가져요`; return; }
+      delete state.group; save(); toast('그룹에서 나왔어요'); go('group');
+    });
+  }
+
+  // ── edit hub ──
+  function renderEdit() {
+    const g = state.goal, n = state.notify;
+    const perm = 'Notification' in window ? Notification.permission : 'unsupported';
+    $app.innerHTML = `
+      <div class="bar">
+        <button class="iconbtn" data-go="home">${icon('back')}홈</button>
+      </div>
+      <h2 class="screen-title">수정하기</h2>
+      <div class="section-title">${icon('fish')}목표</div>
+      <div class="habit crayon">
+        <img src="${g.photo}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:6px;flex:none">
+        <div class="grow"><div class="name">${won(g.price)}</div><div class="amt">사진 · 목표 가격</div></div>
+        <button class="iconbtn" data-go="goal">${icon('pencil')}</button>
+      </div>
+      <div class="section-title">${icon('coin')}아낄 소비</div>
+      ${state.habits.map(h => `
+        <div class="habit crayon alt">
+          <div class="grow"><div class="name">${esc(h.name)}</div><div class="amt">한 번에 ${won(h.amount)}</div></div>
+          <button class="iconbtn" data-habit="${h.id}">${icon('pencil')}</button>
+        </div>`).join('')}
+      <button class="btn crayon" data-habit="" style="width:100%">${icon('plus')}아낄 소비 추가</button>
+      <div class="section-title">${icon('bell')}매일 알림</div>
+      <div class="card crayon">
+        <div class="row" style="align-items:center">
+          <div class="input crayon alt" style="flex:1"><input id="timeIn" type="time" value="${n.time}"></div>
+          <button class="btn ${n.on ? 'ink' : 'crayon'}" id="notifyBtn" style="flex:1">${n.on ? '알림 켜짐' : '알림 켜기'}</button>
+        </div>
+        <p class="note">${perm === 'denied' ? '브라우저에서 알림이 막혀 있어요. 브라우저 설정에서 허용해 주세요.'
+          : perm === 'unsupported' ? '이 브라우저는 알림을 지원하지 않아요. 홈 화면에서 매일 물어볼게요.'
+          : '앱이 열려 있을 때 이 시간에 알려 드려요. 홈 화면에서도 매일 물어봐요.'}</p>
+      </div>
+      <div class="section-title">${icon('fish')}계정</div>
+      <div class="habit crayon alt">
+        <div class="grow"><div class="name">${state.user?.email ? esc(state.user.email) : '로그인 없이 쓰는 중'}</div><div class="amt">기록은 이 기기에 저장돼요</div></div>
+        <button class="iconbtn" id="logoutBtn">${state.user?.email ? '로그아웃' : '로그인'}</button>
+      </div>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      delete state.user; save(); go('login');
+    });
+    document.getElementById('timeIn').addEventListener('change', e => {
+      state.notify.time = e.target.value || '21:00'; save(); schedule();
+    });
+    document.getElementById('notifyBtn').addEventListener('click', async () => {
+      if (state.notify.on) { state.notify.on = false; save(); schedule(); return renderEdit(); }
+      if (!('Notification' in window)) return toast('이 브라우저는 알림을 지원하지 않아요.');
+      let p = 'denied'; try { p = await Notification.requestPermission(); } catch (e) {}
+      if (p !== 'granted') { toast('알림이 허용되지 않았어요.'); return renderEdit(); }
+      state.notify.on = true; save(); schedule(); renderEdit();
+    });
+  }
+
+  // ── events ──
+  $app.addEventListener('click', e => {
+    const t = e.target.closest('[data-go],[data-log],[data-undo],[data-habit],[data-delx],[data-poke]');
+    if (!t) return;
+    if (t.dataset.poke) return poke(t.dataset.poke);
+    if (t.dataset.go) return go(t.dataset.go === 'home' && !state.goal ? 'goal' : t.dataset.go);
+    if (t.dataset.delx) {
+      if (!t.dataset.sure) { t.dataset.sure = '1'; t.textContent = '한 번 더 누르면 지워져요'; return; }
+      state.extras = state.extras.filter(x => x.id !== t.dataset.delx);
+      save(); return renderHome();
+    }
+    if ('habit' in t.dataset) { editingHabit = t.dataset.habit || null; return go('habit'); }
+    const d = today();
+    if (t.dataset.log) {
+      const h = state.habits.find(x => x.id === t.dataset.log);
+      state.logs[d] = state.logs[d] || {};
+      const savedIt = t.dataset.v === '1';
+      state.logs[d][h.id] = { s: savedIt, a: h.amount };
+      save(); renderHome();
+      toast(savedIt ? `+${won(h.amount)} 굴비에 한 걸음!` : '내일은 꼭 아껴 봐요');
+      if (savedIt) checkFanfare();
+    }
+    if (t.dataset.undo) {
+      delete state.logs[d][t.dataset.undo];
+      save(); renderHome();
+    }
+  });
+
+  let toastTimer;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.remove('hidden');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('hidden'), 2000);
+  }
+
+  // ── daily reminder (fires while the app is open) ──
+  let notifyTimer;
+  function schedule() {
+    clearTimeout(notifyTimer);
+    if (!state.notify.on || !('Notification' in window) || Notification.permission !== 'granted') return;
+    const [hh, mm] = state.notify.time.split(':').map(Number);
+    const now = new Date(), at = new Date(); at.setHours(hh, mm, 0, 0);
+    if (at <= now) at.setDate(at.getDate() + 1);
+    notifyTimer = setTimeout(() => { remind(); schedule(); }, at - now);
+  }
+  function remind() {
+    const log = state.logs[today()] || {};
+    const left = state.habits.filter(h => !log[h.id]);
+    if (!left.length) return;
+    const n = new Notification('자린고비', { body: left.map(h => question(h.name)).join('\n'), tag: 'jaringobi-daily' });
+    n.onclick = () => { window.focus(); go('home'); n.close(); };
+  }
+  // new day while open → refresh questions
+  let lastDay = today();
+  setInterval(() => { if (today() !== lastDay) { lastDay = today(); if (screen === 'home') renderHome(); } }, 60000);
+
+  // opened from a friend's invite link → join that group (demo copy on this device)
+  const inv = location.hash.match(/^#invite-([\w-]+)$/);
+  if (inv) {
+    try {
+      const o = dec(inv[1]);
+      if (!state.group) {
+        state.group = { name: String(o.n).slice(0, 20), price: Number(o.p) || 0, photo: DEFAULT_PHOTO, createdAt: today(),
+          members: [{ id: 'host', name: '초대한 친구', saved: 0, habit: { name: '커피 안 사기', amount: 3000 } }] };
+        save();
+      }
+      setTimeout(() => toast(`‘${state.group.name}’ 그룹에 들어왔어요`), 300);
+      if (state.user) screen = 'group';
+    } catch (e) {}
+    history.replaceState(null, '', location.pathname);
+  }
+
+  render(); schedule();
+})();
+</script>
+</body>
+</html>
