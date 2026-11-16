@@ -136,7 +136,43 @@
   .fanfare .big { font-size:52px; font-weight:700; letter-spacing:-1px; line-height:1.1; }
   .fanfare .ico.trumpet { width:72px; height:72px; }
   @keyframes pop { from { transform:scale(.4) rotate(-8deg); opacity:0 } to { transform:scale(1) rotate(0); opacity:1 } }
-  @media (prefers-reduced-motion: reduce) { .member.wiggle, .fanfare .card { animation:none; } }
+  .tabnum { font-variant-numeric:tabular-nums; }
+
+  /* hanging goal: drops in when first hung, then sways a little */
+  .photo-frame.sway { animation:sway 4.5s ease-in-out infinite; transform-origin:50% -34px; }
+  .photo-frame.drop { animation:drop .8s cubic-bezier(.3,1.5,.5,1), sway 4.5s ease-in-out .8s infinite; transform-origin:50% -34px; }
+  @keyframes sway { 0%,100% { transform:rotate(-2.2deg) } 50% { transform:rotate(-.2deg) } }
+  @keyframes drop { from { transform:translateY(-70px) rotate(-8deg); opacity:0 } to { transform:rotate(-1.2deg); opacity:1 } }
+
+  /* how many more times */
+  .formula { padding:10px 14px; margin:14px 4px 0; font-size:20px; line-height:1.4; text-align:center; }
+  .formula b { font-size:24px; }
+  .formula .left { display:block; color:var(--mute); font-size:17px; }
+
+  /* today gauge toward the fanfare (5×) */
+  .gauge { padding:10px 12px 6px; margin-bottom:12px; text-align:center; }
+  .gauge svg { display:block; width:100%; max-width:300px; height:auto; margin:0 auto; overflow:visible; }
+  .gauge text { font-family:'Gaegu', sans-serif; fill:var(--ink); }
+  .gauge .muted { fill:var(--mute); }
+  .gauge .hint { color:var(--mute); font-size:17px; margin-top:-2px; }
+
+  /* goal reached → "진짜 살 거야?" */
+  .goal-card .mini { position:relative; width:min(200px, 70%); margin:0 auto 12px; padding:8px; }
+  .goal-card .mini img { display:block; width:100%; height:auto; max-height:28vh; object-fit:contain; border-radius:6px; background:var(--soft); }
+  .stamp { position:absolute; right:-18px; top:-12px; font-size:28px; font-weight:700; padding:0 12px; transform:rotate(12deg) scale(0); transition:transform .45s cubic-bezier(.2,1.8,.4,1); }
+  .stamp.on { transform:rotate(12deg) scale(1); }
+  .goal-card .track { margin:4px 0 0; }
+  .goal-card .fill { transition:none; }
+  .ask-title { font-size:40px; font-weight:700; letter-spacing:-1px; line-height:1.1; margin-top:2px; }
+  .verdict { padding:14px 16px; margin-top:12px; font-size:19px; line-height:1.45; word-break:keep-all; animation:pop .5s cubic-bezier(.2,1.6,.4,1); }
+  .verdict b { display:block; font-size:28px; }
+  .shake { animation:shake .45s ease; }
+  @keyframes shake { 20%,60% { transform:translateX(-8px) rotate(-2deg) } 40%,80% { transform:translateX(8px) rotate(2deg) } }
+  .done-card { padding:14px 16px; margin:16px 0 0; text-align:center; }
+  .done-card .t { font-size:26px; font-weight:700; }
+  .done-card .s { color:var(--mute); font-size:18px; margin:2px 0 10px; }
+
+  @media (prefers-reduced-motion: reduce) { .member.wiggle, .fanfare .card, .photo-frame.sway, .photo-frame.drop, .shake, .verdict { animation:none; } .stamp { transition:none; } }
 </style>
 <!-- crayon filters & hand-drawn icons -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -181,6 +217,63 @@
   const digits = v => Number(String(v).replace(/[^\d]/g, '')) || 0;
   const DEFAULT_PHOTO = 'gulbi.svg';
   const SAMPLE_PHOTO = 'sample.jpg';
+  const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ── voice: recorded Typecast clips (캐스팅 다은) in voices/, plus a small "뿅" chime ──
+  const VOICES = {
+    save: ['nudge-1', 'nudge-3', 'nudge-6', 'nudge-4'], // 잘하고 있어 · 페이스 좋아 · …
+    miss: ['skip-5'], fanfare: ['done-1'], target: ['target-1'],
+    tempt: ['tempt-5'], keep: ['target-5'], buy: ['target-6'],
+  };
+  const soundOn = () => state.sound !== false;
+  let clip = null; const lastPick = {};
+  function say(kind) {
+    if (!soundOn()) return;
+    const list = VOICES[kind]; let i = Math.floor(Math.random() * list.length);
+    if (list.length > 1 && i === lastPick[kind]) i = (i + 1) % list.length;
+    lastPick[kind] = i;
+    try { clip && clip.pause(); clip = new Audio(`voices/${list[i]}.m4a`); clip.play().catch(() => {}); } catch (e) {}
+  }
+  let actx = null;
+  function boing() {
+    if (!soundOn()) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(660, t); o.frequency.exponentialRampToValueAtTime(1320, t + .12);
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.18, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + .22);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + .24);
+    } catch (e) {}
+  }
+
+  // black-and-white confetti burst from both bottom corners onto a canvas; returns stop()
+  function confetti(cv) {
+    if (reduceMotion()) return () => {};
+    const dpr = devicePixelRatio || 1, W = innerWidth, H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+    const inks = ['#111', '#111', '#555', '#999'];
+    const bits = Array.from({ length: 160 }, (_, i) => {
+      const left = i % 2 === 0, a = (left ? -1 : -2.14) + (Math.random() - .5) * .7, v = 9 + Math.random() * 9;
+      return { x: left ? 0 : W, y: H, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6,
+        vr: (Math.random() - .5) * .3, s: 5 + Math.random() * 8, k: i % 3, c: inks[i % 4] };
+    });
+    let raf = 0; const t0 = performance.now();
+    (function tick(t) {
+      ctx.clearRect(0, 0, W, H);
+      for (const b of bits) {
+        b.vy += .28; b.vx *= .99; b.x += b.vx; b.y += b.vy; b.r += b.vr;
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r); ctx.fillStyle = ctx.strokeStyle = b.c; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        if (b.k === 0) ctx.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2);
+        else if (b.k === 1) { ctx.beginPath(); ctx.moveTo(0, -b.s / 2); ctx.lineTo(b.s / 2, b.s / 2); ctx.lineTo(-b.s / 2, b.s / 2); ctx.fill(); }
+        else { ctx.beginPath(); ctx.moveTo(-b.s, 0); ctx.quadraticCurveTo(-b.s / 2, -b.s / 2, 0, 0); ctx.quadraticCurveTo(b.s / 2, b.s / 2, b.s, 0); ctx.stroke(); }
+        ctx.restore();
+      }
+      if (t - t0 < 4000) raf = requestAnimationFrame(tick); else ctx.clearRect(0, 0, W, H);
+    })(t0);
+    return () => cancelAnimationFrame(raf);
+  }
 
   // ── state ──
   let state = load();
@@ -240,7 +333,7 @@
 
   // ── home ──
   function renderHome() {
-    const g = state.goal, sum = total();
+    const g = state.goal, sum = total(), dg = dailyGoal();
     const pct = g.price ? Math.min(100, sum / g.price * 100) : 0;
     const t = today(), log = state.logs[t] || {};
     const asks = state.habits.map(h => {
@@ -272,14 +365,18 @@
       <div class="hang">
         <svg class="string" viewBox="0 0 120 46"><g style="filter:url(#crayon)" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round">
           <circle cx="60" cy="6" r="4"/><path d="M60 10 L18 44 M60 10 L102 44"/></g></svg>
-        <div class="photo-frame crayon thick"><img src="${g.photo}" alt="${esc(g.name || '목표 물건 사진')}"></div>
+        <div class="photo-frame crayon thick ${justHung ? 'drop' : 'sway'}"><img src="${g.photo}" alt="${esc(g.name || '목표 물건 사진')}"></div>
       </div>
       ${g.name ? `<p class="goal-name">${esc(g.name)}</p>` : ''}
       <div class="amount"><span class="now">${won(sum)}</span> <span class="goal">/ ${won(g.price)}</span></div>
       <div class="track crayon"><div class="fill" style="width:${pct}%"></div></div>
       <div class="pct"><span>달성률 <b>${pct >= 100 ? 100 : pct.toFixed(1)}%</b></span><span>남은 돈 ${won(Math.max(0, g.price - sum))}</span></div>
-      ${pct >= 100 ? `<div class="cheer crayon">굴비를 다 모았어요! 🎉</div>` : ''}
+      ${pct < 100 && dg ? `<div class="formula crayon alt">${won(g.price)} ÷ ${won(dg)} = <b>${timesFor(g.price).toLocaleString('ko-KR')}${timesUnit()}</b> 참으면 굴비 GET
+        <span class="left">지금부터 ${timesFor(g.price - sum).toLocaleString('ko-KR')}${timesUnit()} 남았어요</span></div>` : ''}
+      ${pct >= 100 ? doneCard() : ''}
       <div class="section-title">${icon('coin')}오늘의 절약</div>
+      ${dg ? `<div class="gauge crayon">${gaugeSvg(dayTotal(t), dg)}
+        <p class="hint">${state.fanfare?.[t] ? '오늘 빵빠레 터졌어요!' : dayTotal(t) >= dg * 5 ? '빵빠레 기준을 넘었어요!' : `빵빠레까지 ${won(dg * 5 - dayTotal(t))} (하루 목표 × 5)`}</p></div>` : ''}
       ${asks || `<div class="empty crayon">아낄 소비를 먼저 정해 주세요.<br><br><button class="btn ink" data-go="habit" style="width:100%">${icon('plus')}아낄 소비 정하기</button></div>`}
       ${(state.extras || []).filter(x => x.date === t).map(x => `
         <div class="ask crayon alt">
@@ -301,7 +398,21 @@
       : `<button class="btn crayon" id="xOpen" style="width:100%;margin-top:4px">${icon('plus')}오늘 아낀 소비</button>`}
       ${tabbar('home')}
     `;
+    justHung = false;
     bindExtra();
+    document.getElementById('askBuy')?.addEventListener('click', openDecide);
+  }
+  let justHung = false;
+
+  // shown on home once the goal is full: ask "진짜 살 거야?", or show what was decided
+  function doneCard() {
+    const d = state.goalDone;
+    if (!d) return `<div class="done-card crayon"><p class="t">굴비를 다 모았어요!</p><p class="s">마지막으로 한 번만 더 물어볼게요.</p>
+      <button class="btn ink" id="askBuy" style="width:100%">진짜 살 거야?</button></div>`;
+    return `<div class="done-card crayon">
+      <p class="t">${d.choice === 'buy' ? `샀다! ${esc(goalTitle())} GET` : '안 샀다! 진정한 자린고비 인정'}</p>
+      <p class="s">${d.choice === 'buy' ? '자린고비답게 걸어 두고 쳐다만 보는 중' : `${won(state.goal.price)}은 통장에 그대로`}</p>
+      <button class="btn ink" data-go="goal" style="width:100%">${icon('plus')}새 굴비 걸기</button></div>`;
   }
 
   const tabbar = on => `
@@ -328,11 +439,13 @@
       const name = extraDraft.name.trim();
       if (!name) return toast('무엇을 아꼈는지 적어 주세요.');
       if (!extraDraft.amount) return toast('아낀 금액을 적어 주세요.');
+      const prev = total();
       state.extras = state.extras || [];
       state.extras.push({ id: uid(), date: today(), name, amount: extraDraft.amount });
       save(); toast(`+${won(extraDraft.amount)} 굴비에 한 걸음!`);
       extraOpen = false; extraDraft = { name: '', amount: 0 }; renderHome();
-      checkFanfare();
+      boing(); setTimeout(() => say('save'), 150);
+      afterSaving(prev);
     });
   }
 
@@ -379,7 +492,10 @@
       if (!draft.price) return toast('목표 가격을 적어 주세요.');
       const prev = state.goal;
       state.goal = { photo: draft.photo || DEFAULT_PHOTO, price: draft.price, name: prev && draft.photo === prev.photo ? prev.name : undefined };
-      if (!save()) { state.goal = prev; return; }
+      const prevDone = state.goalDone;
+      // a new photo or price is a new goal: it drops in on home and gets its own "진짜 살 거야?"
+      if (!prev || prev.photo !== state.goal.photo || prev.price !== state.goal.price) { delete state.goalDone; justHung = true; }
+      if (!save()) { state.goal = prev; state.goalDone = prevDone; justHung = false; return; }
       if (first) go(state.habits.length ? 'home' : 'habit'); else { toast('저장했어요'); go('edit'); }
     });
   }
@@ -391,8 +507,9 @@
     state = {
       goal: { photo: SAMPLE_PHOTO, price: 399000, name: '소니 WH-1000XM5 노이즈캔슬링 헤드폰' },
       habits: [ { id: 'coffee', name: '커피 안 사기', amount: 3000 } ],
-      logs, extras: [], notify: state.notify, user: state.user,
+      logs, extras: [], notify: state.notify, user: state.user, sound: state.sound,
     };
+    justHung = true;
     save(); toast('발표용 예시를 걸었어요'); go('home');
   }
 
@@ -520,35 +637,120 @@
         <button class="btn ink" style="width:100%">고마워!</button>
       </div>`;
     document.body.appendChild(el);
-    const close = () => { el.remove(); cancelAnimationFrame(raf); };
+    const stop = confetti(el.querySelector('canvas'));
+    const close = () => { stop(); el.remove(); };
     el.querySelector('button').addEventListener('click', close);
     el.addEventListener('click', e => { if (e.target === el) close(); });
-    let raf = 0;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    // black-and-white confetti burst from both bottom corners
-    const cv = el.querySelector('canvas'), dpr = devicePixelRatio || 1;
-    const W = innerWidth, H = innerHeight;
-    cv.width = W * dpr; cv.height = H * dpr;
-    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
-    const inks = ['#111', '#111', '#555', '#999'];
-    const bits = Array.from({ length: 160 }, (_, i) => {
-      const left = i % 2 === 0, a = (left ? -1 : -2.14) + (Math.random() - .5) * .7, v = 9 + Math.random() * 9;
-      return { x: left ? 0 : W, y: H, vx: Math.cos(a) * v * (left ? 1 : 1), vy: Math.sin(a) * v, r: Math.random() * 6,
-        vr: (Math.random() - .5) * .3, s: 5 + Math.random() * 8, k: i % 3, c: inks[i % 4] };
-    });
-    const t0 = performance.now();
-    (function tick(t) {
-      ctx.clearRect(0, 0, W, H);
-      for (const b of bits) {
-        b.vy += .28; b.vx *= .99; b.x += b.vx; b.y += b.vy; b.r += b.vr;
-        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r); ctx.fillStyle = ctx.strokeStyle = b.c; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-        if (b.k === 0) ctx.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2);
-        else if (b.k === 1) { ctx.beginPath(); ctx.moveTo(0, -b.s / 2); ctx.lineTo(b.s / 2, b.s / 2); ctx.lineTo(-b.s / 2, b.s / 2); ctx.fill(); }
-        else { ctx.beginPath(); ctx.moveTo(-b.s, 0); ctx.quadraticCurveTo(-b.s / 2, -b.s / 2, 0, 0); ctx.quadraticCurveTo(b.s / 2, b.s / 2, b.s, 0); ctx.stroke(); }
-        ctx.restore();
-      }
-      if (t - t0 < 4000) raf = requestAnimationFrame(tick); else ctx.clearRect(0, 0, W, H);
+    say('fanfare');
+  }
+
+  // ── goal reached: count up, stamp, then ask once more "진짜 살 거야?" ──
+  const goalTitle = () => state.goal?.name || '내 굴비';
+  const timesFor = amount => { const dg = dailyGoal(); return dg ? Math.ceil(amount / dg) : 0; };
+  const timesUnit = () => state.habits.length > 1 ? '일' : '번';
+  // called after any saving; shows the finish once when the total crosses the goal, else the daily fanfare check
+  function afterSaving(prevSum) {
+    const g = state.goal;
+    if (g && prevSum < g.price && total() >= g.price && !state.goalDone) return showGoalDone(prevSum);
+    checkFanfare();
+  }
+  function showGoalDone(from) {
+    const g = state.goal, el = document.createElement('div');
+    el.className = 'fanfare';
+    el.innerHTML = `<canvas></canvas>
+      <div class="card crayon thick goal-card" role="dialog" aria-label="목표 달성">
+        <div class="mini crayon alt"><img src="${g.photo}" alt=""><span class="stamp crayon" id="gdStamp">달성!</span></div>
+        <p class="big tabnum" id="gdNum">${won(from)}</p>
+        <div class="track crayon"><div class="fill" id="gdFill" style="width:${Math.min(100, from / g.price * 100)}%"></div></div>
+        <p class="lead" style="margin:8px 0 14px">${esc(goalTitle())} · ${won(g.price)}</p>
+        <button class="btn ink" id="gdNext" style="width:100%">진짜 살 거야?</button>
+      </div>`;
+    document.body.appendChild(el);
+    let stop = () => {};
+    const t0 = performance.now(), dur = reduceMotion() ? 1 : 1800;
+    (function step(t) {
+      const p = Math.min(1, (t - t0) / dur), e = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      const v = from + (g.price - from) * e;
+      const num = el.querySelector('#gdNum'); if (!num) return;
+      num.textContent = won(v);
+      el.querySelector('#gdFill').style.width = (v / g.price * 100) + '%';
+      if (p < 1) return requestAnimationFrame(step);
+      el.querySelector('#gdStamp').classList.add('on');
+      stop = confetti(el.querySelector('canvas'));
+      say('target');
     })(t0);
+    el.querySelector('#gdNext').addEventListener('click', () => { stop(); el.remove(); openDecide(); });
+  }
+  function openDecide() {
+    const g = state.goal, el = document.createElement('div');
+    el.className = 'fanfare';
+    el.innerHTML = `<canvas></canvas>
+      <div class="card crayon thick goal-card" role="dialog" aria-label="진짜 살 거야?">
+        <div class="mini crayon"><img src="${g.photo}" alt=""></div>
+        <p class="ask-title" id="dTitle">진짜 살 거야?</p>
+        <p class="lead" id="dSub" style="margin:6px 0 14px">${esc(goalTitle())} · ${won(g.price)}</p>
+        <div class="choices" id="dChoices">
+          <button class="btn ink" id="dBuy">산다</button>
+          <button class="btn crayon alt" id="dKeep">안 산다</button>
+        </div>
+        <div id="dVerdict"></div>
+      </div>`;
+    document.body.appendChild(el);
+    let asked = 0, stop = () => {};
+    const close = () => { stop(); el.remove(); renderHome(); };
+    const finish = (choice, title, html) => {
+      state.goalDone = { choice, date: today() }; save();
+      el.querySelector('#dTitle').textContent = title;
+      el.querySelector('#dChoices').remove();
+      el.querySelector('#dVerdict').innerHTML = `<div class="verdict crayon alt">${html}</div>
+        <div class="choices"><button class="btn ink" id="dNew">${icon('plus')}새 굴비 걸기</button><button class="btn crayon" id="dClose">닫기</button></div>`;
+      el.querySelector('#dNew').addEventListener('click', () => { stop(); el.remove(); go('goal'); });
+      el.querySelector('#dClose').addEventListener('click', close);
+    };
+    el.querySelector('#dBuy').addEventListener('click', e => {
+      asked++;
+      if (asked === 1) {
+        const b = e.currentTarget; b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
+        el.querySelector('#dTitle').textContent = '한 번 더 물어볼게. 진짜?';
+        const n = timesFor(g.price), h = state.habits[0];
+        el.querySelector('#dSub').innerHTML = n
+          ? `${won(g.price)}이면 ${state.habits.length > 1 ? '하루치' : esc(h.name)} <b>${n.toLocaleString('ko-KR')}${timesUnit()}</b>이야…`
+          : `${won(g.price)}이야…`;
+        b.innerHTML = '그래도 산다';
+        say('tempt');
+        return;
+      }
+      stop = confetti(el.querySelector('canvas'));
+      finish('buy', '샀다!', `<b>${esc(goalTitle())} GET!</b>참고 모은 돈이니까 떳떳하게 사요.<br>…근데 자린고비답게 일단 천장에 걸어 두고 쳐다만 본대요.`);
+      say('buy');
+    });
+    el.querySelector('#dKeep').addEventListener('click', () => {
+      finish('keep', '안 샀다!', `<b>진정한 자린고비 인정</b>${won(g.price)}은 통장에 그대로.<br>다음 굴비를 걸러 가요.`);
+      say('keep');
+    });
+  }
+
+  // half-circle gauge: today's savings against the daily goal, 5× marks the fanfare
+  function gaugeSvg(got, goal) {
+    const MAX = 6, frac = Math.min(got, goal * MAX) / (goal * MAX);
+    let ticks = '';
+    for (let k = 0; k <= MAX; k++) {
+      const a = Math.PI - Math.PI * k / MAX, r2 = k === 5 ? 186 : 172;
+      const x = 210 + Math.cos(a) * 168, y = 240 - Math.sin(a) * 168;
+      const x2 = 210 + Math.cos(a) * r2, y2 = 240 - Math.sin(a) * r2;
+      const lx = 210 + Math.cos(a) * (r2 + 16), ly = 240 - Math.sin(a) * (r2 + 16) + 6;
+      ticks += `<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="#111" stroke-width="${k === 5 ? 4 : 2}" stroke-linecap="round"/>`
+        + `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="${k === 5 ? 24 : 18}" ${k === 5 ? 'font-weight="700"' : 'class="muted"'}>${k}×</text>`;
+    }
+    return `<svg viewBox="0 -12 420 270" role="img" aria-label="오늘 아낀 금액 ${won(got)}, 하루 목표의 ${Math.floor(got / goal)}배">
+      <g style="filter:url(#crayon)">
+        <path d="M60 240 A150 150 0 0 1 360 240" fill="none" stroke="#e2e2e2" stroke-width="26" stroke-linecap="round"/>
+        <path d="M60 240 A150 150 0 0 1 360 240" fill="none" stroke="#111" stroke-width="26" stroke-linecap="round" pathLength="100" stroke-dasharray="${(frac * 100).toFixed(2)} 100"/>
+      </g>
+      ${ticks}
+      <text x="210" y="208" text-anchor="middle" font-size="46" font-weight="700">${won(got)}</text>
+      <text x="210" y="240" text-anchor="middle" font-size="22" class="muted">하루 목표의 ${Math.floor(got / goal)}배</text>
+    </svg>`;
   }
 
   // ── group: shared goal with friends (presentation demo; friends are simulated on this device) ──
@@ -759,12 +961,21 @@
           : perm === 'unsupported' ? '이 브라우저는 알림을 지원하지 않아요. 홈 화면에서 매일 물어볼게요.'
           : '앱이 열려 있을 때 이 시간에 알려 드려요. 홈 화면에서도 매일 물어봐요.'}</p>
       </div>
+      <div class="section-title">${icon('trumpet')}소리</div>
+      <div class="card crayon alt">
+        <button class="btn ${soundOn() ? 'ink' : 'crayon'}" id="soundBtn" style="width:100%">${soundOn() ? '목소리 켜짐' : '목소리 꺼짐'}</button>
+        <p class="note">‘아꼈어’를 누르거나 빵빠레가 터질 때 응원 목소리가 나와요.<br>목소리: AI 가상 성우 서비스 타입캐스트(https://typecast.ai) · 캐스팅 다은</p>
+      </div>
       <div class="section-title">${icon('fish')}계정</div>
       <div class="habit crayon alt">
         <div class="grow"><div class="name">${state.user?.email ? esc(state.user.email) : '로그인 없이 쓰는 중'}</div><div class="amt">기록은 이 기기에 저장돼요</div></div>
         <button class="iconbtn" id="logoutBtn">${state.user?.email ? '로그아웃' : '로그인'}</button>
       </div>
     `;
+    document.getElementById('soundBtn').addEventListener('click', () => {
+      state.sound = !soundOn(); save(); renderEdit();
+      if (soundOn()) say('save');
+    });
     document.getElementById('logoutBtn').addEventListener('click', () => {
       delete state.user; save(); go('login');
     });
@@ -795,12 +1006,14 @@
     const d = today();
     if (t.dataset.log) {
       const h = state.habits.find(x => x.id === t.dataset.log);
+      const prev = total();
       state.logs[d] = state.logs[d] || {};
       const savedIt = t.dataset.v === '1';
       state.logs[d][h.id] = { s: savedIt, a: h.amount };
       save(); renderHome();
       toast(savedIt ? `+${won(h.amount)} 굴비에 한 걸음!` : '내일은 꼭 아껴 봐요');
-      if (savedIt) checkFanfare();
+      if (savedIt) { boing(); setTimeout(() => say('save'), 150); afterSaving(prev); }
+      else say('miss');
     }
     if (t.dataset.undo) {
       delete state.logs[d][t.dataset.undo];
