@@ -410,18 +410,12 @@
 
   // shown on home once the goal is full: ask "진짜 살 거야?", or show what was decided
   function doneCard() {
-    const d = state.goalDone;
-    const askBtn = label => `<button class="btn ink" id="askBuy" style="width:100%">${label}</button>`;
-    if (!d) return `<div class="done-card crayon"><p class="t">굴비를 다 모았어요!</p><p class="s">사기 전에 두 가지만 물어볼게요.</p>${askBtn('물어보기')}</div>`;
-    if (d.choice === 'wait') {
-      const due = today() >= d.until;
-      return `<div class="done-card crayon"><p class="t">${due ? '다시 물어볼 날이에요' : '구매를 미뤄 뒀어요'}</p>
-        <p class="s">${due ? '일주일 동안 생각해 봤나요?' : `${md(d.until)}에 다시 물어볼게요 · ${won(state.goal.price)}은 그대로`}</p>
-        ${askBtn(due ? '다시 물어보기' : '지금 다시 생각하기')}</div>`;
-    }
-    return `<div class="done-card crayon">
-      <p class="t">${d.choice === 'buy' ? `샀다! ${esc(goalTitle())}` : '목표를 바꾸기로 했어요'}</p>
-      <p class="s">${d.choice === 'buy' ? '충분히 생각하고 고른 선택이에요' : `모은 ${won(state.goal.price)}으로 다음 굴비를 걸어요`}</p>
+    const d = state.goalDone, m = money(state.goal.price);
+    if (!d) return `<div class="done-card crayon"><p class="t">${m}, 다 모았어요!</p><p class="s">사기 전에 두 가지만 물어볼게요.</p>
+      <button class="btn ink" id="askBuy" style="width:100%">물어보기</button></div>`;
+    const t = { buy: `샀다! ${esc(goalTitle())}`, keep: '안 샀다! 모은 것도, 안 산 것도 대단해요', cooled: '마음이 바뀌었어요' }[d.choice] || '굴비를 다 모았어요';
+    const sub = { buy: '충분히 생각하고 고른 선택이에요', keep: `모은 ${m}은 그대로 남아 있어요`, cooled: `모은 ${m}으로 다음 굴비를 걸어요` }[d.choice] || '';
+    return `<div class="done-card crayon"><p class="t">${t}</p><p class="s">${sub}</p>
       <button class="btn ink" data-go="goal" style="width:100%">${icon('plus')}새 굴비 걸기</button></div>`;
   }
 
@@ -696,8 +690,10 @@
   // 2) after choosing to buy: even counting the money and the waiting, do you want it?
   // buying, waiting a week, or changing the goal are all fine answers.
   const MORAL = '<span class="moral">참았으니 사지 말라는 앱이 아니라,<br>충분히 생각하고 사도록 돕는 앱이에요.</span>';
-  const addDays = (d, n) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
-  const md = d => `${+d.slice(5, 7)}월 ${+d.slice(8, 10)}일`;
+  // 500,000 → "50만 원", other amounts as usual
+  const money = n => n % 10000 === 0 ? `${(n / 10000).toLocaleString('ko-KR')}만 원` : won(n);
+  // "커피 안 사기 167번" (or "하루치 12일" with several habits)
+  const effort = amount => { const n = timesFor(amount); if (!n) return ''; return `${state.habits.length > 1 ? '하루치' : state.habits[0].name} ${n.toLocaleString('ko-KR')}${timesUnit()}`; };
   function openDecide() {
     const g = state.goal, el = document.createElement('div');
     el.className = 'fanfare';
@@ -721,7 +717,7 @@
       $d('#dChoices').innerHTML = buttons.map((b, i) => `<button class="btn ${i ? 'crayon' + (i % 2 ? ' alt' : '') : 'ink'}" data-pick="${b[0]}">${b[1]}</button>`).join('');
     };
     const finish = (choice, title, html) => {
-      state.goalDone = { choice, date: today(), ...(choice === 'wait' ? { until: addDays(today(), 7) } : {}) }; save();
+      state.goalDone = { choice, date: today() }; save();
       $d('#dStep').textContent = '';
       $d('#dTitle').textContent = title;
       $d('#dSub').textContent = '';
@@ -732,28 +728,29 @@
       $d('#dClose').addEventListener('click', close);
     };
     const ask1 = () => ask('질문 1 / 2 · 목표를 다 모은 뒤', '처음 걸어뒀을 때만큼, 지금도 갖고 싶나요?',
-      `${esc(goalTitle())} · ${won(g.price)}`, [['want', '응, 지금도 갖고 싶어'], ['change', '그 정도는 아니야']]);
+      `${esc(goalTitle())} · ${won(g.price)}`, [['want', '응, 지금도 갖고 싶어'], ['cooled', '그 정도는 아니야']]);
     const ask2 = () => {
       const n = timesFor(g.price), h = state.habits[0];
       ask('질문 2 / 2 · 산다고 고른 뒤', '이걸 위해 모은 돈과 기다린 시간을 생각해도, 사고 싶은가요?',
         n ? `${won(g.price)} = ${state.habits.length > 1 ? '하루치' : esc(h.name)} <b>${n.toLocaleString('ko-KR')}${timesUnit()}</b> 참은 돈` : `${won(g.price)}을 모은 시간`,
-        [['buy', '그래도 산다'], ['wait', '조금 더 생각할래'], ['change', '목표 바꿀래']]);
+        [['buy', '그래도 산다'], ['keep', '안 살래']]);
       boing();
     };
     $d('#dChoices').addEventListener('click', e => {
       const b = e.target.closest('[data-pick]'); if (!b) return;
       const k = b.dataset.pick;
       if (k === 'want') return ask2();
+      const m = money(g.price), ef = effort(g.price);
       if (k === 'buy') {
         stop = confetti($d('canvas'));
-        finish('buy', '샀다!', `<b>충분히 생각하고 고른 선택이에요</b>두 번 물어도 갖고 싶다면 사도 돼요.<br>참은 시간만큼 더 소중해질 거예요.`);
+        finish('buy', '샀다!', `<b>${m}, 정말 잘 모았어요!</b>${ef ? `${esc(ef)}을 참아서 만든 돈이에요. ` : ''}두 번 물어도 갖고 싶다면 충분히 생각한 선택이니까, 기분 좋게 사요. 참은 시간만큼 더 소중해질 거예요.`);
         return say('buy');
       }
-      if (k === 'wait') {
-        finish('wait', '조금 더 생각하기', `<b>구매를 미뤄 둘게요</b>모은 ${won(g.price)}은 그대로 있어요.<br>${md(addDays(today(), 7))}에 다시 물어볼게요.`);
+      if (k === 'keep') {
+        finish('keep', '안 샀다!', `<b>모은 것도, 안 산 것도 대단해요</b>${m}을 모은 끈기로 마지막까지 한 번 더 생각했네요. 모은 ${m}은 그대로 남아요. 다음엔 어떤 굴비를 걸어 볼까요?`);
         return say('keep');
       }
-      finish('change', '목표 바꾸기', `<b>마음이 바뀌어도 괜찮아요</b>모은 ${won(g.price)}으로 다음 굴비를 걸어요.`);
+      finish('cooled', '마음이 바뀌었네요', `<b>그래도 ${m}을 모은 건 그대로예요</b>갖고 싶은 마음은 변해도${ef ? `, ${esc(ef)}을 참은 건 남아요` : ', 참은 시간은 남아요'}. 그 돈으로 진짜 갖고 싶은 다음 굴비를 걸어요.`);
       say('keep');
     });
     ask1();
