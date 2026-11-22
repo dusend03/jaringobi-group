@@ -67,6 +67,9 @@
   .ask .q { font-size:24px; font-weight:700; }
   .ask .sub { color:var(--mute); font-size:17px; margin-top:2px; }
   .choices { display:flex; gap:10px; margin-top:12px; }
+  a.btn { text-decoration:none; color:inherit; }
+  a.btn.ink { color:var(--paper); }
+  .btn.buy { width:100%; margin-top:12px; }
   .btn { flex:1; border:none; background:var(--paper); padding:12px 8px; font-size:21px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
   .btn.ink { background:var(--ink); color:var(--paper); border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; }
   .btn.ink .ico { stroke:var(--paper); }
@@ -149,12 +152,6 @@
   .formula b { font-size:24px; }
   .formula .left { display:block; color:var(--mute); font-size:17px; }
 
-  /* today gauge toward the fanfare (5×) */
-  .gauge { padding:10px 12px 6px; margin-bottom:12px; text-align:center; }
-  .gauge svg { display:block; width:100%; max-width:300px; height:auto; margin:0 auto; overflow:visible; }
-  .gauge text { font-family:'Gaegu', sans-serif; fill:var(--ink); }
-  .gauge .muted { fill:var(--mute); }
-  .gauge .hint { color:var(--mute); font-size:17px; margin-top:-2px; }
 
   /* goal reached → "진짜 살 거야?" */
   .goal-card .mini { position:relative; width:min(200px, 70%); margin:0 auto 12px; padding:8px; }
@@ -379,8 +376,6 @@
         <span class="left">지금부터 ${timesFor(g.price - sum).toLocaleString('ko-KR')}${timesUnit()} 남았어요</span></div>` : ''}
       ${pct >= 100 ? doneCard() : ''}
       <div class="section-title">${icon('coin')}오늘의 절약</div>
-      ${dg ? `<div class="gauge crayon">${gaugeSvg(dayTotal(t), dg)}
-        <p class="hint">${state.fanfare?.[t] ? '오늘 빵빠레 터졌어요!' : dayTotal(t) >= dg * 5 ? '빵빠레 기준을 넘었어요!' : `빵빠레까지 ${won(dg * 5 - dayTotal(t))} (하루 목표 × 5)`}</p></div>` : ''}
       ${asks || `<div class="empty crayon">아낄 소비를 먼저 정해 주세요.<br><br><button class="btn ink" data-go="habit" style="width:100%">${icon('plus')}아낄 소비 정하기</button></div>`}
       ${(state.extras || []).filter(x => x.date === t).map(x => `
         <div class="ask crayon alt">
@@ -416,7 +411,8 @@
     const t = { buy: `샀다! ${esc(goalTitle())}`, keep: '안 샀다! 모은 것도, 안 산 것도 대단해요', cooled: '마음이 바뀌었어요' }[d.choice] || '굴비를 다 모았어요';
     const sub = { buy: '충분히 생각하고 고른 선택이에요', keep: `모은 ${m}은 그대로 남아 있어요`, cooled: `모은 ${m}으로 다음 굴비를 걸어요` }[d.choice] || '';
     return `<div class="done-card crayon"><p class="t">${t}</p><p class="s">${sub}</p>
-      <button class="btn ink" data-go="goal" style="width:100%">${icon('plus')}새 굴비 걸기</button></div>`;
+      ${d.choice === 'buy' ? buyButton() : ''}
+      <button class="btn ${d.choice === 'buy' && buyLink() ? 'crayon' : 'ink'}" data-go="goal" style="width:100%;margin-top:10px">${icon('plus')}새 굴비 걸기</button></div>`;
   }
 
   const tabbar = on => `
@@ -455,7 +451,7 @@
 
   // ── goal (create / edit) ──
   function renderGoal() {
-    draft = draft || { photo: state.goal?.photo || '', price: state.goal?.price || '' };
+    draft = draft || { photo: state.goal?.photo || '', price: state.goal?.price || '', name: state.goal?.name || '' };
     const first = !state.goal;
     $app.innerHTML = `
       <div class="bar">
@@ -472,6 +468,11 @@
         <p class="note">사진을 올리지 않으면 기본 굴비 그림으로 걸려요.</p>
       </div>
       <div class="field">
+        <label for="nameIn">물건 이름 (선택)</label>
+        <div class="input crayon"><input id="nameIn" placeholder="소니 WH-1000XM5" maxlength="40" value="${esc(draft.name || '')}"></div>
+        <p class="note">다 모으면 이 이름으로 쿠팡에서 바로 찾아 드려요.</p>
+      </div>
+      <div class="field">
         <label for="priceIn">목표 가격</label>
         <div class="input crayon alt"><input id="priceIn" inputmode="numeric" placeholder="400,000" value="${draft.price ? Number(draft.price).toLocaleString('ko-KR') : ''}"><span class="unit">원</span></div>
       </div>
@@ -482,6 +483,8 @@
   ${first ? tabbar('home') : ''}
     `;
     document.getElementById('sampleGoal')?.addEventListener('click', loadSample);
+    const nameIn = document.getElementById('nameIn');
+    nameIn.addEventListener('input', () => { draft.name = nameIn.value; });
     const priceIn = document.getElementById('priceIn');
     priceIn.addEventListener('input', () => {
       draft.price = digits(priceIn.value);
@@ -495,7 +498,9 @@
     document.getElementById('saveGoal').addEventListener('click', () => {
       if (!draft.price) return toast('목표 가격을 적어 주세요.');
       const prev = state.goal;
-      state.goal = { photo: draft.photo || DEFAULT_PHOTO, price: draft.price, name: prev && draft.photo === prev.photo ? prev.name : undefined };
+      const name = (draft.name || '').trim() || undefined;
+      state.goal = { photo: draft.photo || DEFAULT_PHOTO, price: draft.price, name,
+        link: prev && prev.name === name ? prev.link : undefined };
       const prevDone = state.goalDone;
       // a new photo or price is a new goal: it drops in on home and gets its own "진짜 살 거야?"
       if (!prev || prev.photo !== state.goal.photo || prev.price !== state.goal.price) { delete state.goalDone; justHung = true; }
@@ -509,7 +514,7 @@
     const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
     const logs = {};
     state = {
-      goal: { photo: SAMPLE_PHOTO, price: 399000, name: '소니 WH-1000XM5 노이즈캔슬링 헤드폰' },
+      goal: { photo: SAMPLE_PHOTO, price: 399000, name: '소니 WH-1000XM5 노이즈캔슬링 헤드폰', link: 'https://www.coupang.com/np/search?q=%EC%86%8C%EB%8B%88%20WH-1000XM5' },
       habits: [ { id: 'coffee', name: '커피 안 사기', amount: 3000 } ],
       logs, extras: [], notify: state.notify, user: state.user, sound: state.sound,
     };
@@ -650,6 +655,15 @@
 
   // ── goal reached: count up, stamp, then ask once more "진짜 살 거야?" ──
   const goalTitle = () => state.goal?.name || '내 굴비';
+  // where "사러 가기" goes: the goal's own link, else a Coupang search for its name.
+  // Swap in a Coupang Partners link (link.coupang.com/…) to earn commission; the required notice then shows.
+  const buyLink = () => state.goal?.link || (state.goal?.name ? `https://www.coupang.com/np/search?q=${encodeURIComponent(state.goal.name)}` : '');
+  const buyButton = () => {
+    const url = buyLink(); if (!url) return '';
+    const partners = /link\.coupang\.com/.test(url);
+    return `<a class="btn ink buy" href="${esc(url)}" target="_blank" rel="noopener${partners ? ' sponsored' : ''}">쿠팡에서 사러 가기</a>
+      ${partners ? '<p class="note" style="text-align:center">이 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>' : ''}`;
+  };
   const timesFor = amount => { const dg = dailyGoal(); return dg ? Math.ceil(amount / dg) : 0; };
   const timesUnit = () => state.habits.length > 1 ? '일' : '번';
   // called after any saving; shows the finish once when the total crosses the goal, else the daily fanfare check
@@ -723,6 +737,7 @@
       $d('#dSub').textContent = '';
       $d('#dChoices').remove();
       $d('#dVerdict').innerHTML = `<div class="verdict crayon alt">${html}${MORAL}</div>
+        ${choice === 'buy' ? buyButton() : ''}
         <div class="choices"><button class="btn ink" id="dNew">${icon('plus')}새 굴비 걸기</button><button class="btn crayon" id="dClose">닫기</button></div>`;
       $d('#dNew').addEventListener('click', () => { stop(); el.remove(); go('goal'); });
       $d('#dClose').addEventListener('click', close);
@@ -754,29 +769,6 @@
       say('keep');
     });
     ask1();
-  }
-
-  // half-circle gauge: today's savings against the daily goal, 5× marks the fanfare
-  function gaugeSvg(got, goal) {
-    const MAX = 6, frac = Math.min(got, goal * MAX) / (goal * MAX);
-    let ticks = '';
-    for (let k = 0; k <= MAX; k++) {
-      const a = Math.PI - Math.PI * k / MAX, r2 = k === 5 ? 186 : 172;
-      const x = 210 + Math.cos(a) * 168, y = 240 - Math.sin(a) * 168;
-      const x2 = 210 + Math.cos(a) * r2, y2 = 240 - Math.sin(a) * r2;
-      const lx = 210 + Math.cos(a) * (r2 + 16), ly = 240 - Math.sin(a) * (r2 + 16) + 6;
-      ticks += `<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="#111" stroke-width="${k === 5 ? 4 : 2}" stroke-linecap="round"/>`
-        + `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="${k === 5 ? 24 : 18}" ${k === 5 ? 'font-weight="700"' : 'class="muted"'}>${k}×</text>`;
-    }
-    return `<svg viewBox="0 -12 420 270" role="img" aria-label="오늘 아낀 금액 ${won(got)}, 하루 목표의 ${Math.floor(got / goal)}배">
-      <g style="filter:url(#crayon)">
-        <path d="M60 240 A150 150 0 0 1 360 240" fill="none" stroke="#e2e2e2" stroke-width="26" stroke-linecap="round"/>
-        <path d="M60 240 A150 150 0 0 1 360 240" fill="none" stroke="#111" stroke-width="26" stroke-linecap="round" pathLength="100" stroke-dasharray="${(frac * 100).toFixed(2)} 100"/>
-      </g>
-      ${ticks}
-      <text x="210" y="208" text-anchor="middle" font-size="46" font-weight="700">${won(got)}</text>
-      <text x="210" y="240" text-anchor="middle" font-size="22" class="muted">하루 목표의 ${Math.floor(got / goal)}배</text>
-    </svg>`;
   }
 
   // ── group: shared goal with friends (presentation demo; friends are simulated on this device) ──
