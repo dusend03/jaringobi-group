@@ -70,6 +70,12 @@
   a.btn { text-decoration:none; color:inherit; }
   a.btn.ink { color:var(--paper); }
   .btn.buy { width:100%; margin-top:12px; }
+  .banner { display:flex; flex-direction:column; gap:2px; margin:16px 0 4px; padding:14px 16px; text-decoration:none; color:var(--ink); }
+  .banner .b-tag { align-self:flex-start; font-size:14px; font-weight:700; background:var(--ink); color:var(--paper); padding:1px 8px; border-radius:4px; }
+  .banner .b-main { font-size:21px; font-weight:700; margin-top:4px; word-break:keep-all; }
+  .banner .b-prod { font-size:18px; word-break:keep-all; }
+  .banner .b-rate { font-size:18px; } .banner .b-rate b { font-size:24px; } .banner small { color:var(--mute); font-size:15px; }
+  .banner .b-src { font-size:13px; color:var(--mute); margin-top:4px; word-break:keep-all; }
   .btn { flex:1; border:none; background:var(--paper); padding:12px 8px; font-size:21px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
   .btn.ink { background:var(--ink); color:var(--paper); border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; }
   .btn.ink .ico { stroke:var(--paper); }
@@ -395,6 +401,7 @@
           </div>
         </div>`
       : `<button class="btn crayon" id="xOpen" style="width:100%;margin-top:4px">${icon('plus')}오늘 아낀 소비</button>`}
+      ${savingsBanner()}
       ${tabbar('home')}
     `;
     justHung = false;
@@ -420,6 +427,31 @@
       <button class="tab ${on === 'home' ? 'on' : ''}" data-go="home">${icon('home')}내 굴비</button>
       <button class="tab ${on === 'group' ? 'on' : ''}" data-go="group">${icon('group')}그룹 굴비</button>
     </div></nav>`;
+
+  // 적금 추천 배너: 금융감독원 파인(FINE) '금융상품한눈에' 적금 공시를 /api/savings 로 받아 와요.
+  // 인증키가 아직 없거나 불러오지 못하면 '예시'라고 적힌 배너를 보여줘요.
+  const SAMPLE_SAVINGS = [{ bank: '예시은행', name: '굴비 모으기 적금', rate: 3.0, max: 4.0, term: 12, type: '자유적립식' }];
+  let savings = { ok: false, items: SAMPLE_SAVINGS }, savingsIdx = 0;
+  fetch('api/savings').then(r => r.json()).then(d => {
+    if (d && d.ok && d.items && d.items.length) { savings = d; if (screen === 'home' && !extraOpen) render(); }
+  }).catch(() => {});
+  setInterval(() => {
+    const el = document.getElementById('savingsBanner');
+    if (!el || savings.items.length < 2) return;
+    savingsIdx = (savingsIdx + 1) % savings.items.length;
+    el.outerHTML = savingsBanner();
+  }, 5000);
+  function savingsBanner() {
+    const it = savings.items[savingsIdx % savings.items.length]; if (!it) return '';
+    const real = savings.ok;
+    return `<a id="savingsBanner" class="banner crayon alt" href="https://finlife.fss.or.kr" target="_blank" rel="noopener">
+      <span class="b-tag">${real ? '적금 추천' : '적금 추천 · 예시'}</span>
+      <span class="b-main">모은 돈, 적금으로 굴려 볼까요?</span>
+      <span class="b-prod">${esc(it.bank)} · ${esc(it.name)}</span>
+      <span class="b-rate">${it.term}개월 최고 연 <b>${Number(it.max).toFixed(2)}%</b> <small>(기본 ${Number(it.rate).toFixed(2)}%)</small></span>
+      <span class="b-src">${real ? '금융감독원 금융상품한눈에 공시 기준 · 우대조건에 따라 달라요' : '예시 상품이에요 · 실제 금리는 금융상품한눈에에서 확인하세요'}</span>
+    </a>`;
+  }
 
   function bindExtra() {
     document.getElementById('xOpen')?.addEventListener('click', () => {
