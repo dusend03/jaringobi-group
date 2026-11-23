@@ -1,6 +1,6 @@
 // 금융감독원 파인(FINE) '금융상품한눈에' 적금 오픈 API를 대신 불러 주는 함수.
 // 인증키는 Vercel 환경 변수 FSS_API_KEY 에 넣어 두세요 (코드에 직접 적지 마세요).
-// 하루 한 번만 금감원에 물어보고, 나머지는 Vercel이 저장해 둔 결과를 돌려줘요.
+// 금감원 약관(제9조)상 받은 정보를 저장하면 안 돼서, 열 때마다 실시간으로 물어봐요. (개인 키는 하루 10,000번까지)
 module.exports = async (req, res) => {
   const key = process.env.FSS_API_KEY;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -32,10 +32,10 @@ module.exports = async (req, res) => {
       .sort((a, b) => b.max - a.max)
       .slice(0, 5);
     if (!items.length) throw new Error('empty');
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=86400');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).end(JSON.stringify({ ok: true, source: '금융감독원 금융상품한눈에', items }));
   } catch (e) {
-    res.setHeader('Cache-Control', 's-maxage=600');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).end(JSON.stringify({ ok: false, reason: 'fetch-failed' }));
   }
 };
