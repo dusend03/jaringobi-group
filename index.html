@@ -402,11 +402,13 @@
         </div>`
       : `<button class="btn crayon" id="xOpen" style="width:100%;margin-top:4px">${icon('plus')}오늘 아낀 소비</button>`}
       ${savingsBanner()}
+      <button class="btn crayon alt" id="partnersDemo" style="width:100%;margin-top:12px;font-size:18px">${icon('coin')}쿠팡 파트너스 (발표용)</button>
       ${tabbar('home')}
     `;
     justHung = false;
     bindExtra();
-    document.getElementById('askBuy')?.addEventListener('click', openDecide);
+    document.getElementById('askBuy')?.addEventListener('click', () => openDecide());
+    document.getElementById('partnersDemo')?.addEventListener('click', () => openDecide(true));
   }
   let justHung = false;
 
@@ -690,10 +692,10 @@
   // where "사러 가기" goes: the goal's own link, else a Coupang search for its name.
   // Swap in a Coupang Partners link (link.coupang.com/…) to earn commission; the required notice then shows.
   const buyLink = () => state.goal?.link || (state.goal?.name ? `https://www.coupang.com/np/search?q=${encodeURIComponent(state.goal.name)}` : '');
-  const buyButton = () => {
+  const buyButton = (demo = false) => {
     const url = buyLink(); if (!url) return '';
-    const partners = /link\.coupang\.com/.test(url);
-    return `<a class="btn ink buy" href="${esc(url)}" target="_blank" rel="noopener${partners ? ' sponsored' : ''}">쿠팡에서 사러 가기</a>
+    const partners = demo || /link\.coupang\.com/.test(url);
+    return `<a class="btn ink buy" href="${esc(url)}" target="_blank" rel="noopener${/link\.coupang\.com/.test(url) ? ' sponsored' : ''}">쿠팡에서 사러 가기</a>
       ${partners ? '<p class="note" style="text-align:center">이 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>' : ''}`;
   };
   const timesFor = amount => { const dg = dailyGoal(); return dg ? Math.ceil(amount / dg) : 0; };
@@ -740,12 +742,14 @@
   const money = n => n % 10000 === 0 ? `${(n / 10000).toLocaleString('ko-KR')}만 원` : won(n);
   // "커피 안 사기 167번" (or "하루치 12일" with several habits)
   const effort = amount => { const n = timesFor(amount); if (!n) return ''; return `${state.habits.length > 1 ? '하루치' : state.habits[0].name} ${n.toLocaleString('ko-KR')}${timesUnit()}`; };
-  function openDecide() {
+  // demo = 발표용: 목표를 다 모은 것처럼 두 질문 → '그래도 산다' → 쿠팡 버튼까지 보여 주고, 기록은 바꾸지 않아요.
+  function openDecide(demo = false) {
     const g = state.goal, el = document.createElement('div');
     el.className = 'fanfare';
     el.innerHTML = `<canvas></canvas>
       <div class="card crayon thick goal-card" role="dialog" aria-label="사기 전에 두 가지 질문">
         <div class="mini crayon"><img src="${g.photo}" alt=""></div>
+        ${demo ? '<p class="note" style="text-align:center;margin:0 0 4px">발표용 · 다 모았다고 치고 보여 줘요</p>' : ''}
         <p class="lead" id="dStep" style="margin:0"></p>
         <p class="ask-title q" id="dTitle"></p>
         <p class="lead" id="dSub" style="margin:6px 0 14px"></p>
@@ -763,15 +767,16 @@
       $d('#dChoices').innerHTML = buttons.map((b, i) => `<button class="btn ${i ? 'crayon' + (i % 2 ? ' alt' : '') : 'ink'}" data-pick="${b[0]}">${b[1]}</button>`).join('');
     };
     const finish = (choice, title, html) => {
-      state.goalDone = { choice, date: today() }; save();
+      if (!demo) { state.goalDone = { choice, date: today() }; save(); }
       $d('#dStep').textContent = '';
       $d('#dTitle').textContent = title;
       $d('#dSub').textContent = '';
       $d('#dChoices').remove();
       $d('#dVerdict').innerHTML = `<div class="verdict crayon alt">${html}${MORAL}</div>
-        ${choice === 'buy' ? buyButton() : ''}
-        <div class="choices"><button class="btn ink" id="dNew">${icon('plus')}새 굴비 걸기</button><button class="btn crayon" id="dClose">닫기</button></div>`;
-      $d('#dNew').addEventListener('click', () => { stop(); el.remove(); go('goal'); });
+        ${choice === 'buy' ? buyButton(demo) : ''}
+        ${demo ? '<p class="note" style="text-align:center">발표용 미리보기예요. 실제 기록은 바뀌지 않아요.</p>' : ''}
+        <div class="choices">${demo ? '' : `<button class="btn ink" id="dNew">${icon('plus')}새 굴비 걸기</button>`}<button class="btn crayon" id="dClose">닫기</button></div>`;
+      $d('#dNew')?.addEventListener('click', () => { stop(); el.remove(); go('goal'); });
       $d('#dClose').addEventListener('click', close);
     };
     const ask1 = () => ask('질문 1 / 2 · 목표를 다 모은 뒤', '처음 걸어뒀을 때만큼, 지금도 갖고 싶나요?',
