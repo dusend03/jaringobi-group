@@ -26,6 +26,14 @@
 
 목소리는 `voices/` 폴더의 녹음 파일이에요. AI 가상 성우 서비스 타입캐스트(https://typecast.ai)의 ‘다은’ 목소리로 만들었고, 무료 플랜 조건(비상업적 사용 · 출처 표기)에 따라 ‘수정’ 화면에 출처를 적어 두었어요.
 
+## 안드로이드 앱 (APK)
+
+- 받기: https://github.com/dusend03/jaringobi-group/releases/download/apk-latest/jaringobi.apk
+- 앱은 https://jaringobi-group.vercel.app 을 그대로 보여 주는 껍데기예요. 웹을 고치면 앱도 따로 다시 만들 필요 없이 바로 바뀌어요.
+- 설치할 때 ‘출처를 알 수 없는 앱 설치’를 허용해야 해요. 아이폰은 APK를 설치할 수 없으니 웹 주소를 쓰세요.
+- APK를 새로 만들려면 GitHub의 Actions 탭 → ‘APK 만들기’ → Run workflow를 누르면 돼요. (`.github/workflows/apk.yml`)
+- 쿠팡·금감원 링크는 앱 밖의 브라우저에서 열려요.
+
 ## 알아둘 점
 
 그룹 기능은 **발표용 시연**이에요. 친구와 친구가 모은 금액은 이 기기 안에서만 만들어진 예시라서, 실제 다른 사람에게 초대나 콕 찌르기가 전달되지는 않아요.
