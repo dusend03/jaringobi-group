@@ -219,6 +219,7 @@
   .fanfare .card.lock-sheet { text-align:left; }
   .lock-sheet .t { font-size:28px; font-weight:700; line-height:1.2; text-align:center; word-break:keep-all; }
   .lock-sheet ol { margin:12px 0; padding-left:26px; font-size:20px; line-height:1.35; word-break:keep-all; }
+  .lock-sheet #safeboxLink { width:100%; text-decoration:none; font-size:20px; padding-left:8px; padding-right:8px; }
   .lock-sheet li + li { margin-top:6px; }
   .lock-sheet .err { margin:4px 6px 0; }
   .lock-sheet .keep { padding:10px 12px; margin:12px 0 0; font-size:17px; line-height:1.35; word-break:keep-all; }
@@ -502,18 +503,22 @@
       <div class="row-end"><p class="note">자린고비는 돈을 보관하지 않아요.</p>${done ? '<button class="undo" id="lockUndo">마지막 기록 지우기</button>' : ''}</div>
     </div>`;
   }
+  // 카카오뱅크 공식 상품 페이지. 계좌 연동이 아니라 링크만 열어요(수수료 없음).
+  const SAFEBOX_URL = 'https://www.kakaobank.com/products/safeboxes';
   function openLock() {
     const max = toLock(); let amount = max;
     const el = document.createElement('div');
     el.className = 'fanfare';
     el.innerHTML = `<div class="card crayon thick lock-sheet" role="dialog" aria-modal="true" aria-label="진짜로 묶어두기">
       <p class="t">진짜로 묶어두기</p>
-      <ol><li>내 은행 앱을 열어요.</li><li>통장 속 금고(예: 카카오뱅크 세이프박스)나 적금으로 직접 옮겨요.</li><li>돌아와서 ‘옮겼어요’를 눌러요.</li></ol>
+      <ol><li>내 은행 앱을 열어요.</li><li>통장 속 금고나 적금으로 옮겨요.</li><li>돌아와서 ‘옮겼어요’를 눌러요.</li></ol>
+      <a class="btn crayon" id="safeboxLink" href="${SAFEBOX_URL}" target="_blank" rel="noopener noreferrer">${icon('link')}카카오뱅크 세이프박스 열기</a>
+      <p class="note" style="margin-bottom:12px">카카오뱅크 공식 안내 페이지가 열려요. 광고나 제휴 링크가 아니에요.</p>
       <label for="lockAmt" style="font-size:18px">옮긴 금액</label>
       <div class="input crayon alt"><input id="lockAmt" inputmode="numeric" value="${max.toLocaleString('ko-KR')}"><span class="unit">원</span></div>
       <p class="err hidden" id="lockErr" role="alert"></p>
       <div class="keep crayon"><b>돈은 내 은행 계좌에 그대로 있어요</b>자린고비는 돈을 받지 않고, 계좌번호나 은행 비밀번호도 묻지 않아요. 여기에는 내가 적은 금액만 남아요.</div>
-      <p class="note">금고에 넣은 돈은 본인이 다시 뺄 수 있어요. 더 단단히 묶고 싶다면 적금이 맞아요. 은행과 제휴한 기능은 아니에요.</p>
+      <p class="note">금고에 넣은 돈은 본인이 다시 뺄 수 있어요. 더 단단히 묶고 싶다면 적금이 맞아요.</p>
       <div class="choices"><button class="btn crayon" data-no>나중에</button><button class="btn ink" data-yes>${icon('check')}옮겼어요</button></div></div>`;
     document.body.appendChild(el);
     const inp = el.querySelector('#lockAmt'), err = el.querySelector('#lockErr');
