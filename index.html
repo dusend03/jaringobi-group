@@ -131,6 +131,20 @@
   .chip.done { background:var(--ink); color:var(--paper); border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; }
   .poke { flex:none; padding:8px 14px; font-size:18px; }
   .poke[disabled] { color:var(--mute); cursor:default; }
+  .member { flex-wrap:wrap; }
+  .member .share { flex-basis:100%; }
+  .mini { height:14px; padding:2px; margin-top:6px; position:relative; }
+  .mini .f { height:100%; border-radius:6px 2px 7px 2px; background:repeating-linear-gradient(-55deg, var(--ink) 0 3px, transparent 3px 7px); }
+  .mini.late .f { background:repeating-linear-gradient(-55deg, var(--mute) 0 2px, transparent 2px 9px); }
+  .share-line { font-size:17px; color:var(--mute); margin-top:3px; }
+  .tag { display:inline-block; font-size:14px; padding:0 8px; margin-left:6px; vertical-align:2px; border-radius:6px; border:2px solid var(--ink); }
+  .tag.late { background:var(--ink); color:var(--paper); }
+  .splitbox { padding:12px 16px; margin:16px 0 4px; font-size:19px; line-height:1.5; word-break:keep-all; }
+  .splitbox b { font-size:26px; }
+  .tone { display:block; width:100%; text-align:left; margin-top:10px; padding:10px 14px; background:var(--paper); border:none; cursor:pointer; font-size:18px; line-height:1.4; word-break:keep-all; }
+  .tone.on { background:var(--soft); }
+  .tone b { display:block; font-size:20px; }
+  .msgbox { font-size:18px; line-height:1.5; padding:10px 12px; background:var(--soft); border-radius:8px; margin:10px 0; word-break:keep-all; white-space:pre-wrap; }
   .member.wiggle { animation:wiggle .5s ease 2; }
   @keyframes wiggle { 0%,100% { transform:rotate(0) } 25% { transform:rotate(-2deg) translateX(-4px) } 75% { transform:rotate(2deg) translateX(4px) } }
 
@@ -822,6 +836,86 @@
     save(); toast('발표용 그룹을 만들었어요'); go('group');
   }
 
+  // ── 1/n: everyone's fair share of the goal, and who is behind it ──
+  const MY_ID = 'me';
+  function splitInfo(g) {
+    const n = g.members.length + 1, share = g.price / n, mine = myGroupSaved();
+    const all = [{ id: MY_ID, saved: mine }, ...g.members.map(m => ({ id: m.id, saved: m.saved }))];
+    const avg = all.reduce((s, x) => s + x.saved, 0) / n;
+    const status = x => {
+      if (x.saved >= share) return 'done';
+      if (avg > 0 && x.saved < avg * 0.8) return 'late';
+      return 'ok';
+    };
+    return { n, share, avg, status };
+  }
+  const voc = n => { const c = [...n.trim()].pop(), k = c.charCodeAt(0) - 0xac00; return n + (k >= 0 && k < 11172 && k % 28 !== 0 ? '아' : '야'); };
+  const gapOf = (m, share) => Math.max(0, Math.ceil(share - m.saved));
+  const daysOf = (m, share) => Math.ceil(gapOf(m, share) / (m.habit?.amount || 3000));
+
+  // nudge messages: gentle cheer / fact check / playful ultimatum / reward pull
+  function nudgeMessages(g, m) {
+    const { share, avg, n } = splitInfo(g), gap = gapOf(m, share), per = m.habit?.amount || 3000, days = daysOf(m, share);
+    const left = Math.max(0, g.price - (myGroupSaved() + g.members.reduce((s, x) => s + x.saved, 0)));
+    const name = m.name, pct = Math.round(m.saved / share * 100);
+    return [
+      { id: 'cheer', title: '응원으로 살살', text: `${voc(name)}, 같이 ‘${g.name}’ 가자! 🙌\n${n}명이 ${won(share)}씩이니까 네 몫까지 ${won(gap)} 남았어. ${m.habit?.name || '하나'} ${days}번이면 채워. 오늘 한 번만 같이 아끼자!` },
+      { id: 'fact', title: '숫자로 자극', text: `${name}, 우리 몫 현황 공유할게.\n1인당 ${won(share)} 중 너는 ${won(m.saved)}(${pct}%), 모임 평균은 ${won(avg)}이야.\n이 속도면 우리 ${won(left)} 남은 거 네 몫 때문에 늦어져 😅 오늘 ${won(per)}만 넣어줘.` },
+      { id: 'last', title: '장난스러운 최후통첩', text: `[${g.name}] 최후통첩 📢\n${name}님, 몫 ${pct}%… 다들 ${won(share)}씩 향해 달리는 중인데 혼자 걷고 있어요.\n오늘 안에 ${won(per)} 안 아끼면 다음 모임 커피는 ${name}님이 쏘는 걸로 😎` },
+      { id: 'goal', title: '목표를 떠올리게', text: `${voc(name)}, ${g.name} 사진 다시 봐봐 ✨\n네가 하루 ${won(per)}씩 ${days}일만 아끼면 우리 같이 가는 거야. 벌써 ${pct}%까지 왔잖아, 조금만 더!` },
+    ];
+  }
+  function openNudge(id) {
+    const g = state.group, m = g?.members.find(x => x.id === id);
+    if (!m) return;
+    const msgs = nudgeMessages(g, m);
+    let cur = msgs[0];
+    const el = document.createElement('div');
+    el.className = 'veil';
+    const draw = () => {
+      el.innerHTML = `
+        <div class="sheet crayon thick" role="dialog" aria-label="${esc(m.name)}님에게 독촉하기" style="max-height:92vh;overflow:auto">
+          <p class="q" style="font-size:24px;font-weight:700">${esc(m.name)}님에게 보내기</p>
+          <p class="lead" style="margin:4px 0 0">내 몫 대비 ${Math.round(m.saved / splitInfo(g).share * 100)}% · 몫까지 ${won(gapOf(m, splitInfo(g).share))} 남았어요</p>
+          ${msgs.map(x => `<button class="tone crayon alt ${x.id === cur.id ? 'on' : ''}" data-tone="${x.id}"><b>${x.title}</b></button>`).join('')}
+          <div class="msgbox" id="msgText">${esc(cur.text)}</div>
+          <button class="btn ink" id="sendNudge" style="width:100%">${icon('poke')}보내기</button>
+          <button class="btn crayon" id="copyNudge" style="width:100%;margin-top:10px">${icon('link')}메시지 복사 (카톡에 붙여넣기)</button>
+          <button class="btn" id="closeNudge" style="width:100%;margin-top:10px;color:var(--mute)">닫기</button>
+        </div>`;
+    };
+    draw();
+    document.body.appendChild(el);
+    const close = () => el.remove();
+    el.addEventListener('click', async e => {
+      if (e.target === el) return close();
+      const t = e.target.closest('[data-tone],#sendNudge,#copyNudge,#closeNudge'); if (!t) return;
+      if (t.dataset.tone) { cur = msgs.find(x => x.id === t.dataset.tone); return draw(); }
+      if (t.id === 'closeNudge') return close();
+      if (t.id === 'copyNudge') {
+        try { await navigator.clipboard.writeText(cur.text); toast('메시지를 복사했어요'); }
+        catch (err) { getSelection().selectAllChildren(el.querySelector('#msgText')); toast('메시지를 길게 눌러 복사해 주세요'); }
+        return;
+      }
+      close(); nudge(id, cur.id);
+    });
+  }
+  function nudge(id, tone) {
+    const g = state.group, m = g?.members.find(x => x.id === id);
+    if (!m) return;
+    m.nudgedOn = today(); m.pokedOn = today(); save(); renderGroup();
+    document.querySelector(`[data-member="${id}"]`)?.classList.add('wiggle');
+    toast(`${m.name}님에게 보냈어요!`);
+    // demo: the friend reacts a moment later (a bigger push gets a bigger answer)
+    setTimeout(() => {
+      if (!state.group || m.today?.date === today()) return;
+      const base = m.habit?.amount || 3000, a = tone === 'last' ? base * 2 : base;
+      m.today = { date: today(), s: true, a }; m.saved += a; save();
+      if (screen === 'group') renderGroup();
+      toast(`${m.name}: 알았어, 지금 ${won(a)} 넣었어!`);
+    }, 2500);
+  }
+
   function renderGroup() {
     const g = state.group;
     if (!g) {
@@ -846,16 +940,29 @@
     const sum = mine + g.members.reduce((s, m) => s + m.saved, 0);
     const pct = Math.min(100, sum / g.price * 100);
     const meDone = dayTotal(d) > 0;
+    const sp = splitInfo(g);
+    const shareBar = (x) => {
+      const st = sp.status(x), p = Math.min(100, x.saved / sp.share * 100);
+      return `<div class="share"><div class="mini crayon ${st === 'late' ? 'late' : ''}"><div class="f" style="width:${p}%"></div></div>
+        <div class="share-line">내 몫 ${won(sp.share)} 중 ${p >= 100 ? '다 채웠어요 ✔' : `${Math.round(p)}% · ${won(Math.ceil(sp.share - x.saved))} 남음`}</div></div>`;
+    };
     const rows = g.members.map(m => {
-      const done = m.today?.date === d && m.today.s, poked = m.pokedOn === d;
+      const done = m.today?.date === d && m.today.s, poked = m.pokedOn === d, st = sp.status(m);
+      const tag = st === 'late' ? `<span class="tag late">몫 뒤처짐</span>` : st === 'done' ? `<span class="tag">몫 완료</span>` : '';
+      const action = st === 'late' && !done
+        ? `<button class="btn ink poke" data-nudge="${m.id}">${icon('poke')}${m.nudgedOn === d ? '또 보내기' : '독촉'}</button>`
+        : done ? `<span class="chip done">오늘 아꼈어</span>`
+        : `<button class="btn crayon poke" data-poke="${m.id}" ${poked ? 'disabled' : ''}>${icon('poke')}${poked ? '콕 찔렀어' : '콕'}</button>`;
       return `
         <div class="member crayon alt" data-member="${m.id}">
           <div class="avatar">${esc(initial(m.name))}</div>
-          <div class="who"><div class="name">${esc(m.name)}</div><div class="amt">${won(m.saved)} 모음</div></div>
-          ${done ? `<span class="chip done">오늘 아꼈어</span>`
-            : `<button class="btn crayon poke" data-poke="${m.id}" ${poked ? 'disabled' : ''}>${icon('poke')}${poked ? '콕 찔렀어' : '콕'}</button>`}
+          <div class="who"><div class="name">${esc(m.name)}${tag}</div><div class="amt">${won(m.saved)} 모음</div></div>
+          ${action}
+          ${shareBar(m)}
         </div>`;
     }).join('');
+    const lateList = g.members.filter(m => sp.status(m) === 'late');
+    const myGap = Math.max(0, Math.ceil(sp.share - mine));
     $app.innerHTML = `
       <div class="bar">
         <div class="logo">${icon('group')}그룹 굴비</div>
@@ -871,11 +978,14 @@
       <div class="track crayon"><div class="fill" style="width:${pct}%"></div></div>
       <div class="pct"><span>달성률 <b>${pct >= 100 ? 100 : pct.toFixed(1)}%</b></span><span>남은 돈 ${won(Math.max(0, g.price - sum))}</span></div>
       ${pct >= 100 ? `<div class="cheer crayon">다 같이 굴비를 모았어요! 🎉</div>` : ''}
+      <div class="splitbox crayon alt">${sp.n}명이 똑같이 나누면 1인당 <b>${won(sp.share)}</b><br>
+        <span style="color:var(--mute);font-size:17px">${myGap > 0 ? `내 몫까지 ${won(myGap)} 남았어요` : '내 몫은 다 채웠어요 👏'}${lateList.length ? ` · 몫이 뒤처진 친구 ${lateList.length}명` : ''}</span></div>
       <div class="section-title">${icon('group')}함께 모으는 친구 ${g.members.length + 1}명</div>
       <div class="member crayon">
         <div class="avatar">나</div>
         <div class="who"><div class="name">나</div><div class="amt">${won(mine)} 모음</div></div>
         ${meDone ? `<span class="chip done">오늘 아꼈어</span>` : `<span class="chip">아직</span>`}
+        ${shareBar({ id: MY_ID, saved: mine })}
       </div>
       ${rows}
       <button class="btn ink" id="inviteBtn" style="width:100%;margin-top:4px">${icon('link')}친구 초대</button>
@@ -1048,9 +1158,10 @@
 
   // ── events ──
   $app.addEventListener('click', e => {
-    const t = e.target.closest('[data-go],[data-log],[data-undo],[data-habit],[data-delx],[data-poke]');
+    const t = e.target.closest('[data-go],[data-log],[data-undo],[data-habit],[data-delx],[data-poke],[data-nudge]');
     if (!t) return;
     if (t.dataset.poke) return poke(t.dataset.poke);
+    if (t.dataset.nudge) return openNudge(t.dataset.nudge);
     if (t.dataset.go) return go(t.dataset.go === 'home' && !state.goal ? 'goal' : t.dataset.go);
     if (t.dataset.delx) {
       if (!t.dataset.sure) { t.dataset.sure = '1'; t.textContent = '한 번 더 누르면 지워져요'; return; }
