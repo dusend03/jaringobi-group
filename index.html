@@ -114,6 +114,8 @@
   .sample .grow { flex:1; min-width:0; line-height:1.25; } .sample .name { font-size:22px; font-weight:700; word-break:keep-all; } .sample .amt { color:var(--mute); font-size:18px; }
   .sample .btn { flex:none; padding:10px 14px; font-size:19px; }
   .err { color:var(--ink); font-weight:700; font-size:18px; margin:6px 6px 0; }
+  .bar-r { display:flex; align-items:center; } .bar-r .iconbtn { padding:8px 7px; white-space:nowrap; } .bar .iconbtn .ico { width:24px; height:24px; }
+  .confirm .t { font-size:26px; font-weight:700; line-height:1.2; word-break:keep-all; } .confirm .s { color:var(--mute); font-size:18px; margin:8px 0 14px; word-break:keep-all; }
   .swap { display:flex; justify-content:center; margin:0 0 4px; } .swap .iconbtn { font-size:17px; color:var(--mute); padding:2px 8px; } .swap .ico { width:20px; height:20px; }
   .row { display:flex; gap:10px; }
   .row > * { flex:1; }
@@ -236,6 +238,7 @@
     <symbol id="i-trumpet" viewBox="0 0 32 32"><path d="M4 13v6h4l14 7V6L8 13z"/><path d="M26 11c2 2 2 8 0 10M28 8c4 4 4 12 0 16"/><path d="M9 19l1 6h3l-1-5"/></symbol>
     <symbol id="i-poke" viewBox="0 0 32 32"><path d="M10 30v-8l-4-5c-1-2 1-4 3-2l3 3V5c0-2 3-2 3 0v9c0-2 3-2 3 0v1c0-2 3-2 3 0v1c0-2 3-2 3 0v6c0 3-1 5-3 8"/></symbol>
     <symbol id="i-link" viewBox="0 0 32 32"><path d="M13 19l6-6"/><path d="M11 15l-3 3c-3 3 3 9 6 6l3-3"/><path d="M21 17l3-3c3-3-3-9-6-6l-3 3"/></symbol>
+    <symbol id="i-restart" viewBox="0 0 32 32"><path d="M9 10c4-5 13-5 16 1s0 14-7 15c-6 1-10-3-11-7"/><path d="M8 4l1 7 7-1"/></symbol>
     <symbol id="i-coin" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10"/><path d="M12 13c1-2 7-2 8 0s-8 4-8 6 7 2 8 0M16 9v14"/></symbol>
   </defs>
 </svg>
@@ -316,9 +319,10 @@
 
   // ── state ──
   let state = load();
+  function blank() { return { goal:null, habits:[], logs:{}, notify:{ on:false, time:'21:00' } }; }
   function load() {
     try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return s; } catch (e) {}
-    return { goal:null, habits:[], logs:{}, notify:{ on:false, time:'21:00' } };
+    return blank();
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
@@ -399,7 +403,7 @@
     $app.innerHTML = `
       <div class="bar">
         <div class="logo">${icon('fish')}자린고비</div>
-        <button class="iconbtn" data-go="edit">${icon('pencil')}수정</button>
+        <div class="bar-r"><button class="iconbtn" data-restart>${icon('restart')}처음으로</button><button class="iconbtn" data-go="edit">${icon('pencil')}수정</button></div>
       </div>
       <div class="hang">
         <svg class="string" viewBox="0 0 120 46"><g style="filter:url(#crayon)" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round">
@@ -538,6 +542,7 @@
     $app.innerHTML = `
       <div class="bar">
         ${first ? `<div class="logo">${icon('fish')}자린고비</div>` : `<button class="iconbtn" data-go="home">${icon('back')}뒤로</button>`}
+        <button class="iconbtn" data-restart>${icon('restart')}처음으로</button>
       </div>
       <h2 class="screen-title">${first ? '굴비 달기' : '굴비 바꾸기'}</h2>
       <div class="sample crayon alt">
@@ -568,7 +573,8 @@
   ${first ? tabbar('home') : ''}
     `;
     document.getElementById('sampleGoal').addEventListener('click', () => {
-      if (first || confirm('발표용 예시로 새로 시작할까요? 지금까지의 내 굴비 기록은 지워져요.')) loadSample();
+      if (first) return loadSample();
+      askConfirm('발표용 예시로 새로 시작할까요?', '지금까지의 내 굴비 기록은 지워져요.', '새로 시작', loadSample);
     });
     const nameIn = document.getElementById('nameIn');
     nameIn.addEventListener('input', () => { draft.name = nameIn.value; });
@@ -980,7 +986,7 @@
     const g = state.group;
     if (!g) {
       $app.innerHTML = `
-        <div class="bar"><div class="logo">${icon('group')}그룹 굴비</div></div>
+        <div class="bar"><div class="logo">${icon('group')}그룹 굴비</div><button class="iconbtn" data-restart>${icon('restart')}처음으로</button></div>
         <div class="hang">
           <svg class="string" viewBox="0 0 120 46"><g style="filter:url(#crayon)" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round">
             <circle cx="60" cy="6" r="4"/><path d="M60 10 L18 44 M60 10 L102 44"/></g></svg>
@@ -1026,7 +1032,7 @@
     $app.innerHTML = `
       <div class="bar">
         <div class="logo">${icon('group')}그룹 굴비</div>
-        <button class="iconbtn" data-go="groupEdit">${icon('pencil')}수정</button>
+        <div class="bar-r"><button class="iconbtn" data-restart>${icon('restart')}처음으로</button><button class="iconbtn" data-go="groupEdit">${icon('pencil')}수정</button></div>
       </div>
       <div class="hang">
         <svg class="string" viewBox="0 0 120 46"><g style="filter:url(#crayon)" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round">
@@ -1161,6 +1167,7 @@
     $app.innerHTML = `
       <div class="bar">
         <button class="iconbtn" data-go="home">${icon('back')}홈</button>
+        <button class="iconbtn" data-restart>${icon('restart')}처음으로</button>
       </div>
       <h2 class="screen-title">수정하기</h2>
       <div class="section-title">${icon('fish')}목표</div>
@@ -1248,6 +1255,32 @@
   });
 
   let toastTimer;
+  // 되돌릴 수 없는 일은 앱 안에서 한 번 더 물어봐요.
+  function askConfirm(title, sub, yes, onYes) {
+    const el = document.createElement('div');
+    el.className = 'fanfare';
+    el.innerHTML = `<div class="card crayon thick confirm" role="alertdialog" aria-modal="true" aria-label="${title}">
+      <p class="t">${title}</p><p class="s">${sub}</p>
+      <div class="choices"><button class="btn crayon" data-no>취소</button><button class="btn ink" data-yes>${yes}</button></div></div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click', e => {
+      if (e.target.closest('[data-yes]')) { el.remove(); onYes(); }
+      else if (e.target === el || e.target.closest('[data-no]')) el.remove();
+    });
+    el.querySelector('[data-no]').focus();
+  }
+  // 처음으로: 기록을 모두 지우고 시작 화면(로그인)으로 돌아가요. 소리 설정만 남겨요.
+  function restart() {
+    const reset = () => {
+      const sound = state.sound;
+      state = blank(); if (sound !== undefined) state.sound = sound;
+      extraOpen = false; extraDraft = { name: '', amount: 0 }; editingHabit = null; justHung = false;
+      save(); schedule(); go('login');
+    };
+    if (!state.goal && !state.group && !state.habits.length) return reset();
+    askConfirm('처음으로 돌아갈까요?', '내 굴비와 그룹 굴비 기록이 모두 지워지고, 되돌릴 수 없어요.', '처음으로', reset);
+  }
+  document.addEventListener('click', e => { if (e.target.closest('[data-restart]')) restart(); });
   function toast(msg) {
     const el = document.getElementById('toast');
     el.textContent = msg; el.classList.remove('hidden');
