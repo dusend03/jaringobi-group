@@ -208,6 +208,21 @@
   .verdict b { display:block; font-size:28px; }
   .shake { animation:shake .45s ease; }
   @keyframes shake { 20%,60% { transform:translateX(-8px) rotate(-2deg) } 40%,80% { transform:translateX(8px) rotate(2deg) } }
+  .lock { padding:14px 16px 16px; margin:4px 0 14px; scroll-margin-bottom:112px; }
+  .lock .t { font-size:23px; font-weight:700; line-height:1.25; word-break:keep-all; text-wrap:balance; }
+  .lock .two { display:flex; gap:10px; margin:10px 0 12px; }
+  .lock .two > span { flex:1; min-width:0; padding:6px 10px; font-size:16px; color:var(--mute); line-height:1.25; }
+  .lock .two b { display:block; font-size:22px; color:var(--ink); white-space:nowrap; }
+  .lock .note { margin:10px 2px 0; }
+  .lock .row-end { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:2px 8px; }
+  .lock .row-end .undo { margin-left:0; padding:6px 2px 0; }
+  .fanfare .card.lock-sheet { text-align:left; }
+  .lock-sheet .t { font-size:28px; font-weight:700; line-height:1.2; text-align:center; word-break:keep-all; }
+  .lock-sheet ol { margin:12px 0; padding-left:26px; font-size:20px; line-height:1.35; word-break:keep-all; }
+  .lock-sheet li + li { margin-top:6px; }
+  .lock-sheet .err { margin:4px 6px 0; }
+  .lock-sheet .keep { padding:10px 12px; margin:12px 0 0; font-size:17px; line-height:1.35; word-break:keep-all; }
+  .lock-sheet .keep b { display:block; font-size:19px; }
   .done-card { padding:14px 16px; margin:16px 0 0; text-align:center; }
   .done-card .t { font-size:26px; font-weight:700; }
   .done-card .s { color:var(--mute); font-size:18px; margin:2px 0 10px; }
@@ -239,6 +254,7 @@
     <symbol id="i-poke" viewBox="0 0 32 32"><path d="M10 30v-8l-4-5c-1-2 1-4 3-2l3 3V5c0-2 3-2 3 0v9c0-2 3-2 3 0v1c0-2 3-2 3 0v1c0-2 3-2 3 0v6c0 3-1 5-3 8"/></symbol>
     <symbol id="i-link" viewBox="0 0 32 32"><path d="M13 19l6-6"/><path d="M11 15l-3 3c-3 3 3 9 6 6l3-3"/><path d="M21 17l3-3c3-3-3-9-6-6l-3 3"/></symbol>
     <symbol id="i-restart" viewBox="0 0 32 32"><path d="M9 10c4-5 13-5 16 1s0 14-7 15c-6 1-10-3-11-7"/><path d="M8 4l1 7 7-1"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 32 32"><path d="M7 15c0-1 1-2 2-2h14c1 0 2 1 2 2v10c0 1-1 2-2 2H9c-1 0-2-1-2-2z"/><path d="M11 13V9c0-6 10-6 10 0v4M16 18v4"/></symbol>
     <symbol id="i-coin" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10"/><path d="M12 13c1-2 7-2 8 0s-8 4-8 6 7 2 8 0M16 9v14"/></symbol>
   </defs>
 </svg>
@@ -334,6 +350,10 @@
     sum + Object.values(day).reduce((s, l) => s + (l.s ? l.a : 0), 0), 0)
     + (state.extras || []).reduce((s, x) => s + x.amount, 0);
 
+  // 진짜로 묶은 돈: 사용자가 은행 앱에서 직접 옮긴 뒤 '옮겼어요'로 적은 금액. 앱은 돈을 받거나 보관하지 않아요.
+  const locked = () => (state.locks || []).reduce((s, x) => s + x.amount, 0);
+  const toLock = () => Math.max(0, total() - locked());
+
   // today's saved amount (habits marked 아꼈어 + one-off savings)
   const dayTotal = d => Object.values(state.logs[d] || {}).reduce((s, l) => s + (l.s ? l.a : 0), 0)
     + (state.extras || []).filter(x => x.date === d).reduce((s, x) => s + x.amount, 0);
@@ -427,6 +447,7 @@
             <button class="undo" data-delx="${x.id}">지우기</button>
           </div>
         </div>`).join('')}
+      ${lockCard()}
       ${extraOpen ? `
         <div class="ask crayon thick">
           <p class="q" style="margin-bottom:10px">오늘 아낀 소비</p>
@@ -445,6 +466,13 @@
     justHung = false;
     bindExtra();
     document.getElementById('askBuy')?.addEventListener('click', () => openDecide());
+    document.getElementById('lockOpen')?.addEventListener('click', openLock);
+    document.getElementById('lockUndo')?.addEventListener('click', () => {
+      const x = state.locks[state.locks.length - 1];
+      askConfirm('마지막 기록을 지울까요?', `${won(x.amount)}을 묶은 기록만 지워져요. 은행의 돈은 그대로예요.`, '지우기', () => {
+        state.locks = state.locks.filter(l => l.id !== x.id); save(); renderHome();
+      });
+    });
     document.getElementById('partnersDemo')?.addEventListener('click', () => openDecide(true));
   }
   let justHung = false;
@@ -460,6 +488,53 @@
       ${d.choice === 'buy' ? buyButton() : ''}
       <button class="btn ${d.choice === 'buy' && buyLink() ? 'crayon' : 'ink'}" data-go="goal" style="width:100%;margin-top:10px">${icon('plus')}새 굴비 걸기</button></div>`;
   }
+
+  // ── 진짜로 묶어두기 ──
+  function lockCard() {
+    const sum = total(), done = locked(), left = toLock();
+    if (!sum && !done) return '';
+    const title = left ? (left === dayTotal(today()) ? `오늘 아낀 ${won(left)}, 진짜로 묶어둘까요?` : `아직 안 묶은 ${won(left)}, 진짜로 묶어둘까요?`)
+      : done > sum ? `아낀 기록보다 ${won(done - sum)} 더 묶었어요` : '아낀 돈을 모두 묶었어요!';
+    return `<div class="lock crayon" id="lockCard">
+      <p class="t">${esc(title)}</p>
+      <div class="two"><span class="crayon alt">아낀 돈<b>${won(sum)}</b></span><span class="crayon">실제로 묶은 돈<b>${won(done)}</b></span></div>
+      ${left ? `<button class="btn ink" id="lockOpen" style="width:100%">${icon('lock')}진짜로 묶어두기</button>` : ''}
+      <div class="row-end"><p class="note">자린고비는 돈을 보관하지 않아요.</p>${done ? '<button class="undo" id="lockUndo">마지막 기록 지우기</button>' : ''}</div>
+    </div>`;
+  }
+  function openLock() {
+    const max = toLock(); let amount = max;
+    const el = document.createElement('div');
+    el.className = 'fanfare';
+    el.innerHTML = `<div class="card crayon thick lock-sheet" role="dialog" aria-modal="true" aria-label="진짜로 묶어두기">
+      <p class="t">진짜로 묶어두기</p>
+      <ol><li>내 은행 앱을 열어요.</li><li>통장 속 금고(예: 카카오뱅크 세이프박스)나 적금으로 직접 옮겨요.</li><li>돌아와서 ‘옮겼어요’를 눌러요.</li></ol>
+      <label for="lockAmt" style="font-size:18px">옮긴 금액</label>
+      <div class="input crayon alt"><input id="lockAmt" inputmode="numeric" value="${max.toLocaleString('ko-KR')}"><span class="unit">원</span></div>
+      <p class="err hidden" id="lockErr" role="alert"></p>
+      <div class="keep crayon"><b>돈은 내 은행 계좌에 그대로 있어요</b>자린고비는 돈을 받지 않고, 계좌번호나 은행 비밀번호도 묻지 않아요. 여기에는 내가 적은 금액만 남아요.</div>
+      <p class="note">금고에 넣은 돈은 본인이 다시 뺄 수 있어요. 더 단단히 묶고 싶다면 적금이 맞아요. 은행과 제휴한 기능은 아니에요.</p>
+      <div class="choices"><button class="btn crayon" data-no>나중에</button><button class="btn ink" data-yes>${icon('check')}옮겼어요</button></div></div>`;
+    document.body.appendChild(el);
+    const inp = el.querySelector('#lockAmt'), err = el.querySelector('#lockErr');
+    inp.addEventListener('input', () => {
+      amount = digits(inp.value); inp.value = amount ? amount.toLocaleString('ko-KR') : ''; err.classList.add('hidden');
+    });
+    el.addEventListener('click', e => {
+      if (e.target === el || e.target.closest('[data-no]')) return el.remove();
+      if (!e.target.closest('[data-yes]')) return;
+      const bad = !amount ? '옮긴 금액을 적어 주세요.' : amount > max ? `아낀 돈 중 아직 안 묶은 건 ${won(max)}이에요.` : '';
+      if (bad) { err.textContent = bad; err.classList.remove('hidden'); return inp.focus(); }
+      state.locks = state.locks || [];
+      state.locks.push({ id: uid(), date: today(), amount });
+      if (!save()) { state.locks.pop(); return; }
+      el.remove(); renderHome(); boing();
+      toast(`${won(amount)}을 진짜로 묶었어요`);
+    });
+    el.querySelector('[data-yes]').focus();
+  }
+  // 방금 아꼈다면 묶어두기 카드가 보이게 살짝 내려요.
+  const showLock = () => document.getElementById('lockCard')?.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
 
   const tabbar = on => `
     <nav class="tabbar" aria-label="탭"><div class="inner">
@@ -530,7 +605,7 @@
       state.extras.push({ id: uid(), date: today(), name, amount: extraDraft.amount });
       save(); toast(`+${won(extraDraft.amount)} 굴비에 한 걸음!`);
       extraOpen = false; extraDraft = { name: '', amount: 0 }; renderHome();
-      boing(); setTimeout(() => say('save'), 150);
+      showLock(); boing(); setTimeout(() => say('save'), 150);
       afterSaving(prev);
     });
   }
@@ -1245,7 +1320,7 @@
       state.logs[d][h.id] = { s: savedIt, a: h.amount };
       save(); renderHome();
       toast(savedIt ? `+${won(h.amount)} 굴비에 한 걸음!` : '내일은 꼭 아껴 봐요');
-      if (savedIt) { boing(); setTimeout(() => say('save'), 150); afterSaving(prev); }
+      if (savedIt) { showLock(); boing(); setTimeout(() => say('save'), 150); afterSaving(prev); }
       else say('miss');
     }
     if (t.dataset.undo) {
