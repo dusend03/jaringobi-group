@@ -71,10 +71,14 @@
   a.btn.ink { color:var(--paper); }
   .btn.buy { width:100%; margin-top:12px; }
   .banner { display:flex; flex-direction:column; gap:2px; margin:16px 0 4px; padding:14px 16px; text-decoration:none; color:var(--ink); }
+  .banner .b-row { display:flex; align-items:center; gap:8px; }
+  .banner .b-txt { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .banner .b-art { flex:none; width:118px; height:auto; overflow:visible; }
+  .banner .b-art text { font-family:'Gaegu', sans-serif; font-weight:700; fill:var(--ink); }
   .banner .b-tag { align-self:flex-start; font-size:14px; font-weight:700; background:var(--ink); color:var(--paper); padding:1px 8px; border-radius:4px; }
   .banner .b-main { font-size:21px; font-weight:700; margin-top:4px; word-break:keep-all; }
   .banner .b-prod { font-size:18px; word-break:keep-all; }
-  .banner .b-rate { font-size:18px; } .banner .b-rate b { font-size:24px; } .banner small { color:var(--mute); font-size:15px; }
+  .banner .b-rate { font-size:18px; } .banner .b-rate b { font-size:24px; } .banner small { color:var(--mute); font-size:15px; display:inline-block; }
   .banner .b-src { font-size:13px; color:var(--mute); margin-top:4px; word-break:keep-all; }
   .btn { flex:1; border:none; background:var(--paper); padding:12px 8px; font-size:21px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
   .btn.ink { background:var(--ink); color:var(--paper); border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; }
@@ -457,14 +461,29 @@
     savingsIdx = (savingsIdx + 1) % savings.items.length;
     el.outerHTML = savingsBanner();
   }, 5000);
+  // 배너 그림: 굴비 저금통에 동전이 떨어지고, 옆에 동전이 자라요.
+  const SAVINGS_ART = `<svg class="b-art" viewBox="0 0 140 140" aria-hidden="true">
+    <g fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="filter:url(#crayon)">
+      <circle cx="54" cy="20" r="15" fill="#fff"/><path d="M32 30l-5 6M76 30l5 6M54 41v5"/>
+      <path d="M96 84l22-18c3 14 3 26 0 38z" fill="#111"/>
+      <path d="M8 86c7-22 25-32 46-32s38 11 45 30c-7 22-24 34-45 34S15 106 8 86z" fill="#111"/>
+      <path d="M36 114l-4 12M74 114l4 12" stroke-width="5"/>
+      <ellipse cx="114" cy="127" rx="18" ry="6" fill="#fff"/><ellipse cx="114" cy="118" rx="18" ry="6" fill="#fff"/><ellipse cx="114" cy="109" rx="18" ry="6" fill="#fff"/>
+      <path d="M4 134c40-4 90-3 130 0"/>
+    </g>
+    <g fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round">
+      <path d="M40 63h28" stroke-width="5"/><circle cx="26" cy="82" r="4.5" fill="#fff"/><path d="M14 94c6 3 11 1 14-3M46 76c6 8 6 18 0 26M61 76c6 8 6 18 0 26M76 76c6 8 6 18 0 26"/>
+    </g><text x="54" y="27" text-anchor="middle" font-size="20">₩</text></svg>`;
   function savingsBanner() {
     const it = savings.items[savingsIdx % savings.items.length]; if (!it) return '';
     const real = savings.ok;
     return `<a id="savingsBanner" class="banner crayon alt" href="https://finlife.fss.or.kr" target="_blank" rel="noopener">
-      <span class="b-tag">${real ? '적금 추천' : '적금 추천 · 예시'}</span>
-      <span class="b-main">모은 돈, 적금으로 굴려 볼까요?</span>
-      <span class="b-prod">${esc(it.bank)} · ${esc(it.name)}</span>
-      <span class="b-rate">${it.term}개월 최고 연 <b>${Number(it.max).toFixed(2)}%</b> <small>(기본 ${Number(it.rate).toFixed(2)}%)</small></span>
+      <span class="b-row"><span class="b-txt">
+        <span class="b-tag">${real ? '적금 추천' : '적금 추천 · 예시'}</span>
+        <span class="b-main">모은 돈, 적금으로<br>굴려 볼까요?</span>
+        <span class="b-prod">${esc(it.bank)} · ${esc(it.name)}</span>
+        <span class="b-rate">${it.term}개월 최고 연 <b>${Number(it.max).toFixed(2)}%</b> <small>(기본 ${Number(it.rate).toFixed(2)}%)</small></span>
+      </span>${SAVINGS_ART}</span>
       <span class="b-src">${real ? '금융상품통합비교공시시스템(금융감독원) 금융회사 상품정보 · 우대조건에 따라 달라요' : '예시 상품이에요 · 실제 금리는 금융상품한눈에에서 확인하세요'}</span>
     </a>`;
   }
@@ -708,9 +727,9 @@
   const buyLink = () => state.goal?.link || (state.goal?.name ? `https://www.coupang.com/np/search?q=${encodeURIComponent(state.goal.name)}` : '');
   const buyButton = (demo = false) => {
     const url = buyLink(); if (!url) return '';
-    const partners = demo || /link\.coupang\.com/.test(url);
+    const partners = /link\.coupang\.com/.test(url);
     return `<a class="btn ink buy" href="${esc(url)}" target="_blank" rel="noopener${/link\.coupang\.com/.test(url) ? ' sponsored' : ''}">쿠팡에서 사러 가기</a>
-      ${partners ? '<p class="note" style="text-align:center">이 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>' : ''}`;
+      ${partners ? '<p class="note" style="text-align:center">이 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>' : demo ? '<p class="note" style="text-align:center">시연용 예시 링크예요. 실제 쿠팡 파트너스 링크가 아니고, 수수료를 받지 않아요.</p>' : ''}`;
   };
   const timesFor = amount => { const dg = dailyGoal(); return dg ? Math.ceil(amount / dg) : 0; };
   const timesUnit = () => state.habits.length > 1 ? '일' : '번';
