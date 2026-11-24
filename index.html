@@ -80,6 +80,10 @@
   .banner .b-prod { font-size:18px; word-break:keep-all; }
   .banner .b-rate { font-size:18px; } .banner .b-rate b { font-size:24px; } .banner small { color:var(--mute); font-size:15px; display:inline-block; }
   .banner .b-src { font-size:13px; color:var(--mute); margin-top:4px; word-break:keep-all; }
+  .sp { text-align:left; padding:14px 16px; margin-top:12px; font-size:17px; word-break:keep-all; }
+  .sp .sp-q { display:flex; gap:12px; align-items:center; margin-top:8px; } .sp .sp-q img { flex:none; width:92px; height:122px; object-fit:cover; border-radius:10px 4px 12px 5px; border:3px solid var(--ink); filter:grayscale(1); } .sp .sp-rec { display:block; margin-top:8px; font-size:19px; font-weight:700; }
+  .sp .sp-t { display:block; font-size:22px; font-weight:700; } .sp q { display:block; margin:8px 0 2px; padding-left:10px; border-left:4px solid var(--ink); font-weight:700; quotes:'“' '”'; }
+  .sp small { display:block; color:var(--mute); font-size:14px; } .sp summary { cursor:pointer; font-weight:700; margin-top:8px; } .sp details p { margin-top:6px; }
   .btn { flex:1; border:none; background:var(--paper); padding:12px 8px; font-size:21px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
   .btn.ink { background:var(--ink); color:var(--paper); border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; }
   .btn.ink .ico { stroke:var(--paper); }
@@ -157,7 +161,8 @@
     padding:16px max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
   .sheet { width:100%; max-width:480px; padding:20px 18px 18px; }
   .linkbox { font-family:ui-monospace, Menlo, monospace; font-size:14px; word-break:break-all; padding:10px 12px; background:var(--soft); border-radius:8px; margin:8px 0 10px; user-select:all; }
-  .fanfare { position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:16px; background:rgba(255,255,255,.7); }
+  .fanfare { position:fixed; inset:0; z-index:50; display:grid; place-items:safe center; overflow-y:auto; padding:16px; background:rgba(255,255,255,.7); }
+  .goal-card:has(.sp) .mini { display:none; }
   .fanfare canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; }
   .fanfare .card { position:relative; max-width:360px; width:100%; text-align:center; padding:26px 20px 20px; animation:pop .5s cubic-bezier(.2,1.6,.4,1); }
   .fanfare .big { font-size:52px; font-weight:700; letter-spacing:-1px; line-height:1.1; }
@@ -178,7 +183,7 @@
 
 
   /* goal reached → "진짜 살 거야?" */
-  .goal-card .mini { position:relative; width:min(200px, 70%); margin:0 auto 12px; padding:8px; }
+  .goal-card .mini { position:relative; height:auto; width:min(200px, 70%); margin:0 auto 12px; padding:8px; }
   .goal-card .mini img { display:block; width:100%; height:auto; max-height:28vh; object-fit:contain; border-radius:6px; background:var(--soft); }
   .stamp { position:absolute; right:-18px; top:-12px; font-size:28px; font-weight:700; padding:0 12px; transform:rotate(12deg) scale(0); transition:transform .45s cubic-bezier(.2,1.8,.4,1); }
   .stamp.on { transform:rotate(12deg) scale(1); }
@@ -775,6 +780,20 @@
   const money = n => n % 10000 === 0 ? `${(n / 10000).toLocaleString('ko-KR')}만 원` : won(n);
   // "커피 안 사기 167번" (or "하루치 12일" with several habits)
   const effort = amount => { const n = timesFor(amount); if (!n) return ''; return `${state.habits.length > 1 ? '하루치' : state.habits[0].name} ${n.toLocaleString('ko-KR')}${timesUnit()}`; };
+  // 안 산 사람에게만: 쓸 곳이 없어진 돈을 길게 모으는 법. 출처와 손실 가능성을 같이 적어요.
+  const SP_CARD = () => {
+    const v = Math.round(state.goal.price * Math.pow(1.1, 10) / 10000);
+    return `<div class="sp crayon"><span class="sp-t">이 돈, 10년 묻어 둘 수 있다면?</span>
+      <span class="sp-q"><img src="buffett.jpg" alt="워런 버핏"><q>10%는 단기 국채에, 90%는 비용이 아주 낮은 S&amp;P 500 인덱스 펀드에 넣으세요.</q></span>
+      <small>워런 버핏, 아내에게 남길 돈을 두고 한 말 · 버크셔 해서웨이 2013년 주주서한(번역)</small>
+      <span class="sp-rec">어렵게 고르지 말고, S&amp;P 500 하나만 조금씩 꾸준히 모아 보세요.</span>
+      <small>떨어지는 해도 있고 원금을 잃을 수 있어요. 곧 쓸 돈은 빼고요.</small>
+      <details><summary>S&amp;P 500이 뭐예요?</summary>
+        <p>미국 대표 대기업 약 500곳을 한 바구니에 담은 주가지수예요. 이 지수를 따라가는 펀드(ETF)를 사면 500곳을 조금씩 나눠 갖는 셈이에요.</p>
+        <p>1928~2025년 연평균 약 10%. 그대로 이어진다고 치면 ${money(state.goal.price)}이 10년 뒤 약 ${v.toLocaleString('ko-KR')}만 원. 하지만 98년 중 26년은 손실이었고, 2008년엔 36.6% 떨어졌어요.</p>
+        <small>배당 포함 · 달러 기준 · 세금·수수료·환율 제외 단순 계산 (자료: NYU 다모다란 교수). 원금을 잃을 수 있고, 곧 쓸 돈은 적금이 맞아요. 일반 정보이고 결정은 본인이 해요. 버핏과 제휴하거나 추천받지 않았어요. 사진: 미국 국제무역청(퍼블릭 도메인)</small>
+      </details></div>`;
+  };
   // demo = 발표용: 목표를 다 모은 것처럼 두 질문 → '그래도 산다' → 쿠팡 버튼까지 보여 주고, 기록은 바꾸지 않아요.
   function openDecide(demo = false) {
     const g = state.goal, el = document.createElement('div');
@@ -806,7 +825,7 @@
       $d('#dSub').textContent = '';
       $d('#dChoices').remove();
       $d('#dVerdict').innerHTML = `<div class="verdict crayon alt">${html}${MORAL}</div>
-        ${choice === 'buy' ? buyButton(demo) : ''}
+        ${choice === 'buy' ? buyButton(demo) : SP_CARD()}
         ${demo ? '<p class="note" style="text-align:center">발표용 미리보기예요. 실제 기록은 바뀌지 않아요.</p>' : ''}
         <div class="choices">${demo ? '' : `<button class="btn ink" id="dNew">${icon('plus')}새 굴비 걸기</button>`}<button class="btn crayon" id="dClose">닫기</button></div>`;
       $d('#dNew')?.addEventListener('click', () => { stop(); el.remove(); go('goal'); });
