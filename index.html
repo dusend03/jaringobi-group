@@ -107,15 +107,23 @@
   .field label.upload, .upload { display:flex; margin:0; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:220px; padding:12px; cursor:pointer; text-align:center; color:var(--mute); }
   .upload img { display:block; width:100%; height:auto; max-height:46vh; object-fit:contain; border-radius:6px; }
   .upload .ico { width:48px; height:48px; }
+  .app { overflow-x:clip; } /* 흔들리는 사진이 화면을 옆으로 넓히지 않게 */
+  .field label.upload:not(:has(img)) { min-height:120px; } .field label.upload img { max-height:26vh; }
+  .sample { display:flex; align-items:center; gap:12px; padding:12px 14px; margin:14px 0 4px; }
+  .sample img { flex:none; width:76px; height:76px; object-fit:contain; border-radius:8px; background:#fff; }
+  .sample .grow { flex:1; min-width:0; line-height:1.25; } .sample .name { font-size:22px; font-weight:700; word-break:keep-all; } .sample .amt { color:var(--mute); font-size:18px; }
+  .sample .btn { flex:none; padding:10px 14px; font-size:19px; }
+  .err { color:var(--ink); font-weight:700; font-size:18px; margin:6px 6px 0; }
+  .swap { display:flex; justify-content:center; margin:0 0 4px; } .swap .iconbtn { font-size:17px; color:var(--mute); padding:2px 8px; } .swap .ico { width:20px; height:20px; }
   .row { display:flex; gap:10px; }
   .row > * { flex:1; }
   .habit { display:flex; align-items:center; gap:10px; padding:12px 14px; margin-bottom:10px; }
   .habit .name { font-weight:700; font-size:21px; }
   .habit .amt { color:var(--mute); font-size:18px; }
   .habit .grow { flex:1; }
-  .note { font-size:16px; color:var(--mute); margin:6px 6px 0; }
+  .note { font-size:16px; color:var(--mute); margin:6px 6px 0; word-break:keep-all; }
   .card { padding:14px 16px; margin-bottom:12px; }
-  .toast { position:fixed; left:50%; bottom:calc(28px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; font-size:19px; z-index:10; white-space:nowrap; transition:opacity .3s; }
+  .toast { position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:255px 18px 225px 18px / 18px 225px 18px 255px; font-size:19px; z-index:60; white-space:nowrap; transition:opacity .3s; }
 
   /* bottom tabs: 내 굴비 / 그룹 굴비 */
   .app { padding-bottom:calc(110px + env(safe-area-inset-bottom, 0px)); }
@@ -177,7 +185,7 @@
   @keyframes drop { from { transform:translateY(-70px) rotate(-8deg); opacity:0 } to { transform:rotate(-1.2deg); opacity:1 } }
 
   /* how many more times */
-  .formula { padding:10px 14px; margin:14px 4px 0; font-size:20px; line-height:1.4; text-align:center; }
+  .formula { padding:10px 14px; margin:14px 4px 0; font-size:20px; line-height:1.4; text-align:center; word-break:keep-all; text-wrap:balance; }
   .formula b { font-size:24px; }
   .formula .left { display:block; color:var(--mute); font-size:17px; }
 
@@ -246,7 +254,8 @@
   const uid = () => Math.random().toString(36).slice(2, 9);
   const digits = v => Number(String(v).replace(/[^\d]/g, '')) || 0;
   const DEFAULT_PHOTO = 'gulbi.svg';
-  const SAMPLE_PHOTO = 'sample.jpg';
+  const SAMPLE_NAME = '에어팟 맥스 2', SAMPLE_PRICE = 731050;
+  const SAMPLE_PHOTO = 'airpods-max-2.jpg';
   const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ── voice: recorded Typecast clips (캐스팅 다은) in voices/, plus a small "뿅" chime ──
@@ -398,6 +407,7 @@
         <div class="photo-frame crayon thick ${justHung ? 'drop' : 'sway'}"><img src="${g.photo}" alt="${esc(g.name || '목표 물건 사진')}"></div>
       </div>
       ${g.name ? `<p class="goal-name">${esc(g.name)}</p>` : ''}
+      <div class="swap"><button class="iconbtn" data-go="goal">${icon('camera')}사진·가격 바꾸기</button></div>
       <div class="amount"><span class="now">${won(sum)}</span> <span class="goal">/ ${won(g.price)}</span></div>
       <div class="track crayon"><div class="fill" style="width:${pct}%"></div></div>
       <div class="pct"><span>달성률 <b>${pct >= 100 ? 100 : pct.toFixed(1)}%</b></span><span>남은 돈 ${won(Math.max(0, g.price - sum))}</span></div>
@@ -527,48 +537,60 @@
     const first = !state.goal;
     $app.innerHTML = `
       <div class="bar">
-        ${first ? `<div class="logo">${icon('fish')}자린고비</div>` : `<button class="iconbtn" data-go="edit">${icon('back')}뒤로</button>`}
+        ${first ? `<div class="logo">${icon('fish')}자린고비</div>` : `<button class="iconbtn" data-go="home">${icon('back')}뒤로</button>`}
       </div>
-      <h2 class="screen-title">굴비 달기</h2>
-      <p class="lead">사고 싶은 물건 사진을 올리고 목표 가격을 적어 주세요.</p>
+      <h2 class="screen-title">${first ? '굴비 달기' : '굴비 바꾸기'}</h2>
+      <div class="sample crayon alt">
+        <img src="${SAMPLE_PHOTO}" alt="">
+        <div class="grow"><div class="amt" style="font-size:16px">발표용 예시</div><div class="name">${SAMPLE_NAME}</div><div class="amt">${won(SAMPLE_PRICE)}</div></div>
+        <button class="btn ${first ? 'ink' : 'crayon'}" id="sampleGoal">바로 걸기</button>
+      </div>
+      <div class="section-title">${icon('camera')}${first ? '직접 올리기' : '직접 바꾸기'}</div>
       <div class="field">
         <label>사진</label>
         <label class="upload crayon thick" for="photoIn">
           ${draft.photo ? `<img src="${draft.photo}" alt="선택한 사진">` : `${icon('camera')}<span>눌러서 사진 올리기</span>`}
         </label>
         <input id="photoIn" type="file" accept="image/*" class="hidden">
-        <p class="note">사진을 올리지 않으면 기본 굴비 그림으로 걸려요.</p>
+        <p class="note">${draft.photo ? '사진을 누르면 다른 사진으로 바꿀 수 있어요.' : '사진을 올리지 않으면 기본 굴비 그림으로 걸려요.'}</p>
       </div>
       <div class="field">
         <label for="nameIn">물건 이름 (선택)</label>
-        <div class="input crayon"><input id="nameIn" placeholder="소니 WH-1000XM5" maxlength="40" value="${esc(draft.name || '')}"></div>
+        <div class="input crayon"><input id="nameIn" placeholder="예: 소니 WH-1000XM5" maxlength="40" value="${esc(draft.name || '')}"></div>
         <p class="note">다 모으면 이 이름으로 쿠팡에서 바로 찾아 드려요.</p>
       </div>
       <div class="field">
         <label for="priceIn">목표 가격</label>
-        <div class="input crayon alt"><input id="priceIn" inputmode="numeric" placeholder="400,000" value="${draft.price ? Number(draft.price).toLocaleString('ko-KR') : ''}"><span class="unit">원</span></div>
+        <div class="input crayon alt" id="priceBox"><input id="priceIn" inputmode="numeric" placeholder="예: 400,000" value="${draft.price ? Number(draft.price).toLocaleString('ko-KR') : ''}"><span class="unit">원</span></div>
+        <p class="err hidden" id="priceErr" role="alert">목표 가격을 적어야 굴비를 걸 수 있어요.</p>
       </div>
-      <div class="row" style="margin-top:8px">
-        <button class="btn ink" id="saveGoal">${icon('check')}${first ? '굴비 걸기' : '저장'}</button>
-        ${first ? `<button class="btn crayon alt" id="sampleGoal">발표용 예시</button>` : ''}
-      </div>
+      <button class="btn ink" id="saveGoal" style="width:100%;margin-top:4px">${icon('check')}${first ? '굴비 걸기' : '저장하고 걸기'}</button>
   ${first ? tabbar('home') : ''}
     `;
-    document.getElementById('sampleGoal')?.addEventListener('click', loadSample);
+    document.getElementById('sampleGoal').addEventListener('click', () => {
+      if (first || confirm('발표용 예시로 새로 시작할까요? 지금까지의 내 굴비 기록은 지워져요.')) loadSample();
+    });
     const nameIn = document.getElementById('nameIn');
     nameIn.addEventListener('input', () => { draft.name = nameIn.value; });
     const priceIn = document.getElementById('priceIn');
     priceIn.addEventListener('input', () => {
       draft.price = digits(priceIn.value);
       priceIn.value = draft.price ? draft.price.toLocaleString('ko-KR') : '';
+      document.getElementById('priceErr').classList.add('hidden');
     });
     document.getElementById('photoIn').addEventListener('change', async e => {
       const f = e.target.files[0]; if (!f) return;
-      draft.photo = await shrink(f);
+      try { draft.photo = await shrink(f); } catch (err) { return toast('이 사진은 열 수 없어요. JPG나 PNG로 올려 주세요.'); }
       renderGoal();
     });
     document.getElementById('saveGoal').addEventListener('click', () => {
-      if (!draft.price) return toast('목표 가격을 적어 주세요.');
+      if (!draft.price) {
+        document.getElementById('priceErr').classList.remove('hidden');
+        const box = document.getElementById('priceBox');
+        box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+        priceIn.focus();
+        return;
+      }
       const prev = state.goal;
       const name = (draft.name || '').trim() || undefined;
       state.goal = { photo: draft.photo || DEFAULT_PHOTO, price: draft.price, name,
@@ -577,18 +599,18 @@
       // a new photo or price is a new goal: it drops in on home and gets its own "진짜 살 거야?"
       if (!prev || prev.photo !== state.goal.photo || prev.price !== state.goal.price) { delete state.goalDone; justHung = true; }
       if (!save()) { state.goal = prev; state.goalDone = prevDone; justHung = false; return; }
-      if (first) go(state.habits.length ? 'home' : 'habit'); else { toast('저장했어요'); go('edit'); }
+      if (first) go(state.habits.length ? 'home' : 'habit'); else { toast('저장했어요'); go('home'); }
     });
   }
 
-  // presentation example: Sony headphones and a coffee habit, starting from 0원
+  // presentation example: AirPods Max 2 (same as the slides) and a coffee habit, starting from 0원
   function loadSample() {
     const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
     const logs = {};
     state = {
-      goal: { photo: SAMPLE_PHOTO, price: 399000, name: '소니 WH-1000XM5 노이즈캔슬링 헤드폰', link: 'https://www.coupang.com/np/search?q=%EC%86%8C%EB%8B%88%20WH-1000XM5' },
+      goal: { photo: SAMPLE_PHOTO, price: SAMPLE_PRICE, name: SAMPLE_NAME, link: 'https://www.coupang.com/vp/products/9439896192?itemId=28075964299&vendorItemId=95032506380' },
       habits: [ { id: 'coffee', name: '커피 안 사기', amount: 3000 } ],
-      logs, extras: [], notify: state.notify, user: state.user, sound: state.sound,
+      logs, extras: [], notify: state.notify, user: state.user, sound: state.sound, group: state.group,
     };
     justHung = true;
     save(); toast('발표용 예시를 걸었어요'); go('home');
