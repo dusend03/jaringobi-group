@@ -69,7 +69,12 @@
   .choices { display:flex; gap:10px; margin-top:12px; }
   a.btn { text-decoration:none; color:inherit; }
   a.btn.ink { color:var(--paper); }
-  .btn.buy { width:100%; margin-top:12px; }
+  .compare { padding:14px 16px; margin-top:12px; text-align:center; }
+  .compare .c-t { font-size:24px; font-weight:700; }
+  .compare .c-s { font-size:18px; line-height:1.4; margin-top:2px; word-break:keep-all; }
+  .compare .c-s small { display:block; font-size:14px; color:var(--mute); }
+  .compare .choices { margin-top:10px; }
+  .compare .choices .btn { flex:1; text-decoration:none; justify-content:center; padding-left:8px; padding-right:8px; }
   .banner { display:flex; flex-direction:column; gap:2px; margin:16px 0 4px; padding:14px 16px; text-decoration:none; color:var(--ink); }
   .banner .b-row { display:flex; align-items:center; gap:8px; }
   .banner .b-txt { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
@@ -448,7 +453,6 @@
             <button class="undo" data-delx="${x.id}">지우기</button>
           </div>
         </div>`).join('')}
-      ${lockCard()}
       ${extraOpen ? `
         <div class="ask crayon thick">
           <p class="q" style="margin-bottom:10px">오늘 아낀 소비</p>
@@ -460,8 +464,10 @@
           </div>
         </div>`
       : `<button class="btn crayon" id="xOpen" style="width:100%;margin-top:4px">${icon('plus')}오늘 아낀 소비</button>`}
+      <div class="section-title">${icon('lock')}모은 돈은 미래로</div>
+      ${lockCard()}
       ${savingsBanner()}
-      <button class="btn crayon alt" id="partnersDemo" style="width:100%;margin-top:12px;font-size:18px">${icon('coin')}쿠팡 파트너스 (발표용)</button>
+      ${pct < 100 ? `<button class="btn crayon alt" id="previewDone" style="width:100%;margin-top:12px;font-size:18px">${icon('fish')}다 모으면 어떻게 될까? 미리 보기</button>` : ''}
       ${tabbar('home')}
     `;
     justHung = false;
@@ -474,7 +480,8 @@
         state.locks = state.locks.filter(l => l.id !== x.id); save(); renderHome();
       });
     });
-    document.getElementById('partnersDemo')?.addEventListener('click', () => openDecide(true));
+    document.getElementById('previewDone')?.addEventListener('click', () => openDecide(true));
+    fillLowest();
   }
   let justHung = false;
 
@@ -487,7 +494,7 @@
     const sub = { buy: '충분히 생각하고 고른 선택이에요', keep: `모은 ${m}은 그대로 남아 있어요`, cooled: `모은 ${m}으로 다음 굴비를 걸어요` }[d.choice] || '';
     return `<div class="done-card crayon"><p class="t">${t}</p><p class="s">${sub}</p>
       ${d.choice === 'buy' ? buyButton() : ''}
-      <button class="btn ${d.choice === 'buy' && buyLink() ? 'crayon' : 'ink'}" data-go="goal" style="width:100%;margin-top:10px">${icon('plus')}새 굴비 걸기</button></div>`;
+      <button class="btn ${d.choice === 'buy' && compareLinks() ? 'crayon' : 'ink'}" data-go="goal" style="width:100%;margin-top:10px">${icon('plus')}새 굴비 걸기</button></div>`;
   }
 
   // ── 진짜로 묶어두기 ──
@@ -627,7 +634,7 @@
       <h2 class="screen-title">${first ? '굴비 달기' : '굴비 바꾸기'}</h2>
       <div class="sample crayon alt">
         <img src="${SAMPLE_PHOTO}" alt="">
-        <div class="grow"><div class="amt" style="font-size:16px">발표용 예시</div><div class="name">${SAMPLE_NAME}</div><div class="amt">${won(SAMPLE_PRICE)}</div></div>
+        <div class="grow"><div class="amt" style="font-size:16px">예시로 시작</div><div class="name">${SAMPLE_NAME}</div><div class="amt">${won(SAMPLE_PRICE)}</div></div>
         <button class="btn ${first ? 'ink' : 'crayon'}" id="sampleGoal">바로 걸기</button>
       </div>
       <div class="section-title">${icon('camera')}${first ? '직접 올리기' : '직접 바꾸기'}</div>
@@ -642,7 +649,7 @@
       <div class="field">
         <label for="nameIn">물건 이름 (선택)</label>
         <div class="input crayon"><input id="nameIn" placeholder="예: 소니 WH-1000XM5" maxlength="40" value="${esc(draft.name || '')}"></div>
-        <p class="note">다 모으면 이 이름으로 쿠팡에서 바로 찾아 드려요.</p>
+        <p class="note">다 모으면 이 이름으로 최저가를 찾아 드려요.</p>
       </div>
       <div class="field">
         <label for="priceIn">목표 가격</label>
@@ -654,7 +661,7 @@
     `;
     document.getElementById('sampleGoal').addEventListener('click', () => {
       if (first) return loadSample();
-      askConfirm('발표용 예시로 새로 시작할까요?', '지금까지의 내 굴비 기록은 지워져요.', '새로 시작', loadSample);
+      askConfirm('예시로 새로 시작할까요?', '지금까지의 내 굴비 기록은 지워져요.', '새로 시작', loadSample);
     });
     const nameIn = document.getElementById('nameIn');
     nameIn.addEventListener('input', () => { draft.name = nameIn.value; });
@@ -679,8 +686,7 @@
       }
       const prev = state.goal;
       const name = (draft.name || '').trim() || undefined;
-      state.goal = { photo: draft.photo || DEFAULT_PHOTO, price: draft.price, name,
-        link: prev && prev.name === name ? prev.link : undefined };
+      state.goal = { photo: draft.photo || DEFAULT_PHOTO, price: draft.price, name };
       const prevDone = state.goalDone;
       // a new photo or price is a new goal: it drops in on home and gets its own "진짜 살 거야?"
       if (!prev || prev.photo !== state.goal.photo || prev.price !== state.goal.price) { delete state.goalDone; justHung = true; }
@@ -689,17 +695,17 @@
     });
   }
 
-  // presentation example: AirPods Max 2 (same as the slides) and a coffee habit, starting from 0원
+  // example goal: AirPods Max 2 (same as the slides) and a coffee habit, starting from 0원
   function loadSample() {
     const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
     const logs = {};
     state = {
-      goal: { photo: SAMPLE_PHOTO, price: SAMPLE_PRICE, name: SAMPLE_NAME, link: 'https://www.coupang.com/vp/products/9439896192?itemId=28075964299&vendorItemId=95032506380' },
+      goal: { photo: SAMPLE_PHOTO, price: SAMPLE_PRICE, name: SAMPLE_NAME },
       habits: [ { id: 'coffee', name: '커피 안 사기', amount: 3000 } ],
       logs, extras: [], notify: state.notify, user: state.user, sound: state.sound, group: state.group,
     };
     justHung = true;
-    save(); toast('발표용 예시를 걸었어요'); go('home');
+    save(); toast('예시를 걸었어요'); go('home');
   }
 
   // keep the real photo, just resized so it fits in browser storage
@@ -835,15 +841,34 @@
 
   // ── goal reached: count up, stamp, then ask once more "진짜 살 거야?" ──
   const goalTitle = () => state.goal?.name || '내 굴비';
-  // where "사러 가기" goes: the goal's own link, else a Coupang search for its name.
-  // Swap in a Coupang Partners link (link.coupang.com/…) to earn commission; the required notice then shows.
-  const buyLink = () => state.goal?.link || (state.goal?.name ? `https://www.coupang.com/np/search?q=${encodeURIComponent(state.goal.name)}` : '');
-  const buyButton = (demo = false) => {
-    const url = buyLink(); if (!url) return '';
-    const partners = /link\.coupang\.com/.test(url);
-    return `<a class="btn ink buy" href="${esc(url)}" target="_blank" rel="noopener${/link\.coupang\.com/.test(url) ? ' sponsored' : ''}">쿠팡에서 사러 가기</a>
-      ${partners ? '<p class="note" style="text-align:center">이 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>' : demo ? '<p class="note" style="text-align:center">시연용 예시 링크예요. 실제 쿠팡 파트너스 링크가 아니고, 수수료를 받지 않아요.</p>' : ''}`;
+  // 그래도 산다면: 쿠팡 수수료 대신 최저가 비교. 광고·제휴 링크가 아니라 사용자 편에서 한 푼이라도 아끼게 해요.
+  const compareLinks = () => {
+    const q = state.goal?.name; if (!q) return null;
+    const e = encodeURIComponent(q);
+    return { naver: `https://search.shopping.naver.com/search/all?query=${e}&sort=price_asc`, danawa: `https://search.danawa.com/dsearch.php?query=${e}` };
   };
+  const buyButton = () => {
+    const l = compareLinks(); if (!l) return '';
+    return `<div class="compare crayon alt">
+      <p class="c-t">사기 전에 최저가부터</p>
+      <p class="c-s" data-lowest>같은 물건을 더 싸게 사면, 그 차액도 아낀 돈이에요.</p>
+      <div class="choices"><a class="btn ink" href="${esc(l.naver)}" target="_blank" rel="noopener noreferrer">네이버 최저가</a><a class="btn crayon" href="${esc(l.danawa)}" target="_blank" rel="noopener noreferrer">다나와 비교</a></div>
+      <p class="note">광고·제휴 링크가 아니라 수수료를 받지 않아요. 가격과 배송비는 판매처에서 확인하세요.</p></div>`;
+  };
+  // 네이버 쇼핑 오픈 API 키가 있으면(api/price) 지금 최저가와 목표가와의 차이를 보여 줘요. 없으면 링크만.
+  let lowest = { key: '', data: null };
+  function fillLowest() {
+    const el = document.querySelector('[data-lowest]'), g = state.goal; if (!el || !g?.name) return;
+    const key = g.name + '|' + g.price;
+    const show = d => {
+      if (!d?.ok || !el.isConnected) return;
+      const gap = g.price - d.price;
+      el.innerHTML = `${esc(d.source)} 최저가 <b>${won(d.price)}</b>${d.mall ? ` · ${esc(d.mall)}` : ''}<br>${gap > 0 ? `목표보다 <b>${won(gap)}</b> 싸요. 이 차액도 묶어둘 수 있어요.` : '목표 가격이 이미 최저가 수준이에요.'}<small>방금 검색한 값이에요 · 배송비·쿠폰 제외</small>`;
+    };
+    if (lowest.key === key) return show(lowest.data);
+    lowest = { key, data: null };
+    fetch(`api/price?q=${encodeURIComponent(g.name)}&p=${g.price}`).then(r => r.json()).then(d => { if (lowest.key === key) { lowest.data = d; show(d); } }).catch(() => {});
+  }
   const timesFor = amount => { const dg = dailyGoal(); return dg ? Math.ceil(amount / dg) : 0; };
   const timesUnit = () => state.habits.length > 1 ? '일' : '번';
   // called after any saving; shows the finish once when the total crosses the goal, else the daily fanfare check
@@ -902,14 +927,14 @@
         <small>배당 포함 · 달러 기준 · 세금·수수료·환율 제외 단순 계산 (자료: NYU 다모다란 교수). 원금을 잃을 수 있고, 곧 쓸 돈은 적금이 맞아요. 일반 정보이고 결정은 본인이 해요. 버핏과 제휴하거나 추천받지 않았어요. 사진: 미국 국제무역청(퍼블릭 도메인)</small>
       </details></div>`;
   };
-  // demo = 발표용: 목표를 다 모은 것처럼 두 질문 → '그래도 산다' → 쿠팡 버튼까지 보여 주고, 기록은 바꾸지 않아요.
+  // demo = 미리 보기: 목표를 다 모은 것처럼 두 질문과 결과까지 보여 주고, 기록은 바꾸지 않아요.
   function openDecide(demo = false) {
     const g = state.goal, el = document.createElement('div');
     el.className = 'fanfare';
     el.innerHTML = `<canvas></canvas>
       <div class="card crayon thick goal-card" role="dialog" aria-label="사기 전에 두 가지 질문">
         <div class="mini crayon"><img src="${g.photo}" alt=""></div>
-        ${demo ? '<p class="note" style="text-align:center;margin:0 0 4px">발표용 · 다 모았다고 치고 보여 줘요</p>' : ''}
+        ${demo ? '<p class="note" style="text-align:center;margin:0 0 4px">미리 보기 · 다 모았다고 치고 보여 줘요</p>' : ''}
         <p class="lead" id="dStep" style="margin:0"></p>
         <p class="ask-title q" id="dTitle"></p>
         <p class="lead" id="dSub" style="margin:6px 0 14px"></p>
@@ -933,9 +958,10 @@
       $d('#dSub').textContent = '';
       $d('#dChoices').remove();
       $d('#dVerdict').innerHTML = `<div class="verdict crayon alt">${html}${MORAL}</div>
-        ${choice === 'buy' ? buyButton(demo) : SP_CARD()}
-        ${demo ? '<p class="note" style="text-align:center">발표용 미리보기예요. 실제 기록은 바뀌지 않아요.</p>' : ''}
+        ${choice === 'buy' ? buyButton() : SP_CARD()}
+        ${demo ? '<p class="note" style="text-align:center">미리 보기예요. 실제 기록은 바뀌지 않아요.</p>' : ''}
         <div class="choices">${demo ? '' : `<button class="btn ink" id="dNew">${icon('plus')}새 굴비 걸기</button>`}<button class="btn crayon" id="dClose">닫기</button></div>`;
+      fillLowest();
       $d('#dNew')?.addEventListener('click', () => { stop(); el.remove(); go('goal'); });
       $d('#dClose').addEventListener('click', close);
     };
@@ -979,7 +1005,7 @@
         { id: 'harin', name: '하린', saved: 127000, habit: { name: '커피 안 사기', amount: 4500 } },
       ],
     };
-    save(); toast('발표용 그룹을 만들었어요'); go('group');
+    save(); toast('예시 그룹을 만들었어요'); go('group');
   }
 
   // ── 1/n: everyone's fair share of the goal, and who is behind it ──
@@ -1076,7 +1102,7 @@
         <p class="lead" style="text-align:center">공동 목표를 정하고, 각자 아낀 돈을 함께 모아요.</p>
         <div class="row">
           <button class="btn ink" data-go="groupEdit">${icon('plus')}그룹 만들기</button>
-          <button class="btn crayon alt" id="sampleGroup">발표용 예시</button>
+          <button class="btn crayon alt" id="sampleGroup">예시 그룹</button>
         </div>
         ${tabbar('group')}`;
       document.getElementById('sampleGroup').addEventListener('click', sampleGroup);
